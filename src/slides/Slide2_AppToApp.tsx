@@ -244,16 +244,6 @@ export function Slide2_AppToApp() {
         )}
       </div>
 
-      {/* Step Number Badge - Top right */}
-      {flowStep !== 'idle' && stepMetadata[flowStep] && (
-        <div className="absolute top-4 right-4 z-50">
-          <div className="bg-neutral-800 text-neutral-100 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
-            <div className="text-sm text-neutral-400">Step</div>
-            <div className="text-3xl font-bold">{stepMetadata[flowStep]!.number}</div>
-          </div>
-        </div>
-      )}
-
       {/* Closed Caption - Bottom center */}
       {flowStep !== 'idle' && stepMetadata[flowStep] && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
