@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { ConsentDialog } from '@/components/ConsentDialog'
+import { AnimatedToken } from '@/components/AnimatedToken'
 import { makeJwt } from '@/lib/tokens'
 import { Play, RotateCcw, ArrowRight } from 'lucide-react'
 
@@ -266,6 +267,85 @@ export function Slide2_AppToApp() {
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
+          {/* Animated Tokens */}
+          {flowStep === 'initiate' && (
+            <AnimatedToken
+              startX={360}
+              startY={380}
+              endX={1050}
+              endY={380}
+              color="#60a5fa"
+              label="🔗"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'zoom_auth_request' && (
+            <AnimatedToken
+              startX={1050}
+              startY={380}
+              endX={630}
+              endY={200}
+              color="#f59e0b"
+              label="🔐"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'code_received' && (
+            <AnimatedToken
+              startX={630}
+              startY={200}
+              endX={1050}
+              endY={380}
+              color="#10b981"
+              label="📝"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'token_exchange' && (
+            <AnimatedToken
+              startX={1050}
+              startY={380}
+              endX={630}
+              endY={200}
+              color="#8b5cf6"
+              label="🔑"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'tokens_received' && (
+            <AnimatedToken
+              startX={630}
+              startY={200}
+              endX={1050}
+              endY={380}
+              color="#ec4899"
+              label="🎫"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'api_call' && (
+            <AnimatedToken
+              startX={360}
+              startY={380}
+              endX={1050}
+              endY={380}
+              color="#06b6d4"
+              label="📤"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'api_response' && (
+            <AnimatedToken
+              startX={1050}
+              startY={380}
+              endX={360}
+              endY={380}
+              color="#22c55e"
+              label="📥"
+              duration={1200}
+            />
+          )}
+          
           {/* API Request - Top left, moved up to avoid overlap */}
           {(flowStep === 'api_call' || flowStep === 'api_response') && (
             <div className="absolute left-8 top-[120px] w-[380px] bg-neutral-900/95 border border-neutral-800 rounded-lg p-4 z-50 shadow-xl">

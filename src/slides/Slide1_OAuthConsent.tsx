@@ -4,6 +4,7 @@ import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { ConsentDialog } from '@/components/ConsentDialog'
 import { LoginDialog } from '@/components/LoginDialog'
+import { AnimatedToken } from '@/components/AnimatedToken'
 import { makeJwt } from '@/lib/tokens'
 import { Play, RotateCcw, ArrowRight } from 'lucide-react'
 
@@ -62,6 +63,7 @@ export function Slide1_OAuthConsent() {
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
   const [idToken, setIdToken] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
+  const [showToken, setShowToken] = useState(false)
 
   const nodes = [
     { id: 'user', x: 64, y: 240, w: 220 },
@@ -147,6 +149,7 @@ export function Slide1_OAuthConsent() {
           aud: 'google-calendar-client-id',
         })
         setIdToken(newIdToken)
+        setShowToken(true)
         setFlowStep('tokens_received')
         break
       case 'tokens_received':
@@ -179,6 +182,7 @@ export function Slide1_OAuthConsent() {
     setUsername(null)
     setShowLoginDialog(false)
     setShowConsentDialog(false)
+    setShowToken(false)
   }
 
   const scopes = [
@@ -249,6 +253,53 @@ export function Slide1_OAuthConsent() {
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
+          {/* Animated Tokens */}
+          {flowStep === 'auth_request' && (
+            <AnimatedToken
+              startX={530}
+              startY={300}
+              endX={1040}
+              endY={300}
+              color="#60a5fa"
+              label="🔐"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'code_received' && (
+            <AnimatedToken
+              startX={1040}
+              startY={300}
+              endX={530}
+              endY={300}
+              color="#10b981"
+              label="📝"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'token_exchange' && (
+            <AnimatedToken
+              startX={530}
+              startY={300}
+              endX={1040}
+              endY={300}
+              color="#8b5cf6"
+              label="🔑"
+              duration={1200}
+            />
+          )}
+          {flowStep === 'tokens_received' && showToken && (
+            <AnimatedToken
+              startX={1040}
+              startY={300}
+              endX={530}
+              endY={300}
+              color="#ec4899"
+              label="🎫"
+              duration={1200}
+              onComplete={() => setShowToken(false)}
+            />
+          )}
+          
           {/* ID Token Display - positioned absolutely within Stage */}
           {flowStep === 'tokens_received' && idToken && (
             <div className="absolute right-8 bottom-8 w-[420px] bg-neutral-900/95 p-6 rounded-lg shadow-2xl border border-neutral-800 z-50 pointer-events-auto">
