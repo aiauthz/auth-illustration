@@ -19,6 +19,7 @@ interface Edge {
   dashed?: boolean
   pulse?: boolean
   visible?: boolean
+  color?: string
 }
 
 interface StageContextValue {

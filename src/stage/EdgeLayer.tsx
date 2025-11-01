@@ -9,6 +9,7 @@ interface Edge {
   dashed?: boolean
   pulse?: boolean
   visible?: boolean
+  color?: string
 }
 
 interface EdgeLayerProps {
@@ -198,23 +199,26 @@ export function EdgeLayer({ edges }: EdgeLayerProps) {
       style={{ overflow: 'visible' }}
     >
       <defs>
-        {visibleEdges.map((edge) => (
-          <marker
-            key={`arrow-${edge.id}`}
-            id={`arrowhead-${edge.id}`}
-            markerWidth="10"
-            markerHeight="10"
-            refX="9"
-            refY="5"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <polygon
-              points="0 0, 10 5, 0 10"
-              fill="rgba(255, 255, 255, 0.8)"
-            />
-          </marker>
-        ))}
+        {visibleEdges.map((edge) => {
+          const arrowColor = edge.color || 'rgba(255, 255, 255, 0.8)'
+          return (
+            <marker
+              key={`arrow-${edge.id}`}
+              id={`arrowhead-${edge.id}`}
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="5"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <polygon
+                points="0 0, 10 5, 0 10"
+                fill={arrowColor}
+              />
+            </marker>
+          )
+        })}
       </defs>
       {visibleEdges.map((edge) => {
         const pathData = paths.get(edge.id)
@@ -225,12 +229,13 @@ export function EdgeLayer({ edges }: EdgeLayerProps) {
 
         const strokeDasharray = edge.dashed ? '8,4' : 'none'
         const strokeDashoffset = edge.pulse ? dashOffset : 0
+        const strokeColor = edge.color || 'rgba(255, 255, 255, 0.8)'
 
         return (
           <g key={edge.id}>
             <path
               d={pathData.path}
-              stroke="rgba(255, 255, 255, 0.8)"
+              stroke={strokeColor}
               strokeWidth="2"
               fill="none"
               markerEnd={`url(#arrowhead-${edge.id})`}
@@ -246,7 +251,7 @@ export function EdgeLayer({ edges }: EdgeLayerProps) {
                   height="18"
                   rx="4"
                   fill="#171717"
-                  stroke="#404040"
+                  stroke={strokeColor}
                   strokeWidth="1"
                 />
                 <text

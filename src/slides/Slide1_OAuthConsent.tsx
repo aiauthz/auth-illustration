@@ -17,6 +17,39 @@ type FlowStep =
   | 'token_exchange'
   | 'tokens_received'
 
+// Step metadata for captions and sequence numbers
+const stepMetadata: Record<FlowStep, { number: number; caption: string } | null> = {
+  idle: null,
+  auth_request: {
+    number: 1,
+    caption: 'User clicks login - Calendar app initiates OAuth flow by redirecting to Okta with client_id, redirect_uri, scopes, and state parameters',
+  },
+  login_shown: {
+    number: 2,
+    caption: 'Okta presents login screen - User enters their username and password to authenticate with the Identity Provider',
+  },
+  login_complete: {
+    number: 3,
+    caption: 'User submits credentials - Username and password are verified by Okta, establishing the user\'s identity',
+  },
+  consent_shown: {
+    number: 4,
+    caption: 'Authorization consent - Okta asks user to grant Calendar app permission to access their profile information',
+  },
+  code_received: {
+    number: 5,
+    caption: 'User grants consent - Okta redirects back to Calendar app with a one-time authorization code',
+  },
+  token_exchange: {
+    number: 6,
+    caption: 'Token exchange - Calendar app exchanges authorization code for tokens by sending it to Okta with client_secret',
+  },
+  tokens_received: {
+    number: 7,
+    caption: 'Authentication complete - Calendar app receives ID token containing user identity information and can now authenticate the user',
+  },
+}
+
 /**
  * Slide 1: User OAuth Consent with Okta (IDP)
  * Full-screen Stage-based layout
@@ -33,7 +66,7 @@ export function Slide1_OAuthConsent() {
   const nodes = [
     { id: 'user', x: 64, y: 240, w: 220 },
     { id: 'calendar', x: 400, y: 240, w: 260 },
-    { id: 'okta', x: 800, y: 240, w: 240 },
+    { id: 'okta', x: 920, y: 240, w: 240 }, // Increased distance from 800 to 920
   ]
 
   // Each arrow is visible only at its specific step - no overlapping
@@ -43,6 +76,7 @@ export function Slide1_OAuthConsent() {
       from: 'calendar',
       to: 'okta',
       label: 'Auth Request (client_id, redirect_uri, scopes, state)',
+      color: '#60a5fa', // Blue
       pulse: flowStep === 'auth_request',
       visible: flowStep === 'auth_request', // Only visible at this step
     },
@@ -51,6 +85,7 @@ export function Slide1_OAuthConsent() {
       from: 'okta',
       to: 'calendar',
       label: 'Authorization Code',
+      color: '#10b981', // Green
       pulse: flowStep === 'code_received',
       visible: flowStep === 'code_received', // Only visible at this step
     },
@@ -59,6 +94,7 @@ export function Slide1_OAuthConsent() {
       from: 'calendar',
       to: 'okta',
       label: 'Token Exchange (code + client_secret)',
+      color: '#8b5cf6', // Purple
       pulse: flowStep === 'token_exchange',
       visible: flowStep === 'token_exchange', // Only visible at this step
     },
@@ -67,6 +103,7 @@ export function Slide1_OAuthConsent() {
       from: 'okta',
       to: 'calendar',
       label: 'ID Token',
+      color: '#ec4899', // Pink
       pulse: flowStep === 'tokens_received',
       visible: flowStep === 'tokens_received', // Only visible at this step
     },
@@ -184,6 +221,30 @@ export function Slide1_OAuthConsent() {
           </>
         )}
       </div>
+
+      {/* Step Number Badge - Top right */}
+      {flowStep !== 'idle' && stepMetadata[flowStep] && (
+        <div className="absolute top-4 right-4 z-50">
+          <div className="bg-neutral-800 text-neutral-100 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
+            <div className="text-sm text-neutral-400">Step</div>
+            <div className="text-3xl font-bold">{stepMetadata[flowStep]!.number}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Closed Caption - Bottom center */}
+      {flowStep !== 'idle' && stepMetadata[flowStep] && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
+          <div className="bg-black/90 text-white px-6 py-4 rounded-lg shadow-2xl border border-neutral-700">
+            <div className="flex items-start gap-4">
+              <div className="bg-neutral-700 text-neutral-100 px-3 py-1 rounded font-bold text-sm flex-shrink-0 mt-0.5">
+                {stepMetadata[flowStep]!.number}
+              </div>
+              <p className="text-base leading-relaxed">{stepMetadata[flowStep]!.caption}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Full-screen Stage */}
       <div className="w-full h-full">

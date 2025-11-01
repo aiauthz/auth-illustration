@@ -1,6 +1,8 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Calendar, Video, Bot, Shield, User } from 'lucide-react'
+import { Bot, Shield, User } from 'lucide-react'
+import { GoogleCalendarLogo } from '@/components/logos/GoogleCalendarLogo'
+import { ZoomLogo } from '@/components/logos/ZoomLogo'
 
 interface ActorCardProps {
   nodeId: string
@@ -22,7 +24,7 @@ const actorConfig: Record<
   calendar: {
     title: 'Google Calendar',
     subtitle: 'Client App',
-    icon: Calendar,
+    icon: GoogleCalendarLogo,
     badge: 'Client App',
   },
   okta: {
@@ -34,7 +36,7 @@ const actorConfig: Record<
   zoom: {
     title: 'Zoom API',
     subtitle: 'Resource Server',
-    icon: Video,
+    icon: ZoomLogo,
     badge: 'API',
   },
   agent: {
