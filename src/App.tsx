@@ -3,6 +3,8 @@ import { SlideFrame } from '@/components/SlideFrame'
 import { Slide1_OAuthConsent } from '@/slides/Slide1_OAuthConsent'
 import { Slide2_AppToApp } from '@/slides/Slide2_AppToApp'
 import { Slide3_DelegatedApiKey } from '@/slides/Slide3_DelegatedApiKey'
+import { Slide4_AgentAsOAuthClient } from '@/slides/Slide4_AgentAsOAuthClient'
+import { Slide5_CrossAppAccess } from '@/slides/Slide5_CrossAppAccess'
 
 const SLIDES = [
   {
@@ -13,6 +15,12 @@ const SLIDES = [
   },
   {
     component: Slide3_DelegatedApiKey,
+  },
+  {
+    component: Slide4_AgentAsOAuthClient,
+  },
+  {
+    component: Slide5_CrossAppAccess,
   },
 ]
 
@@ -48,8 +56,8 @@ function App() {
           setCurrentSlide(currentSlide - 1)
         }
       }
-      // Number keys: 1, 2, 3 - Jump to slide
-      else if (e.key === '1' || e.key === '2' || e.key === '3') {
+      // Number keys: 1, 2, 3, 4, 5 - Jump to slide
+      else if (e.key === '1' || e.key === '2' || e.key === '3' || e.key === '4' || e.key === '5') {
         const slideNum = parseInt(e.key, 10)
         if (slideNum >= 1 && slideNum <= SLIDES.length) {
           setCurrentSlide(slideNum)
