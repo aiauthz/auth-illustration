@@ -70,8 +70,8 @@ export function Slide1_OAuthConsent() {
 
   const nodes = [
     { id: 'user', x: 64, y: 240, w: 220 },
-    { id: 'calendar', x: 400, y: 240, w: 260 },
-    { id: 'okta', x: 920, y: 240, w: 240 }, // Increased distance from 800 to 920
+    { id: 'calendar', x: 480, y: 240, w: 260 }, 
+    { id: 'okta', x: 1000, y: 240, w: 240 }, // Increased distance for better arrow visibility
   ]
 
   // Calculate token positions based on node centers
