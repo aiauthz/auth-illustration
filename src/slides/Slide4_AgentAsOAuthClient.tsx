@@ -71,6 +71,16 @@ export function Slide4_AgentAsOAuthClient() {
   ]
 
   const edges = [
+    // Permanent connection: User to Agent (shows delegation relationship)
+    {
+      id: 'user-to-agent-delegation',
+      from: 'user',
+      to: 'agent',
+      label: '',
+      color: '#3b82f6', // Blue - matches grouping box
+      pulse: false,
+      visible: true, // Always visible
+    },
     // Step 1: Agent to Okta (SSO on behalf of user)
     {
       id: 'agent-to-idp-sso',
@@ -314,6 +324,13 @@ export function Slide4_AgentAsOAuthClient() {
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
+          {/* User & Agent Grouping Rectangle - Shows they're working together */}
+          <div className="absolute left-[150px] top-[165px] w-[300px] h-[590px] border-2 border-dashed border-blue-500/50 rounded-xl bg-blue-950/10 z-10 pointer-events-none">
+            <div className="absolute -top-3 left-4 bg-neutral-900 px-3 py-1 text-xs font-semibold text-blue-400 border border-blue-500/50 rounded">
+              Acting on Behalf of User
+            </div>
+          </div>
+
           {/* Okta Validation Box - Top right during Step 5 */}
           {flowStep === 'okta_verifies' && (
             <div className="absolute right-8 top-24 w-[380px] bg-blue-900/95 border-2 border-blue-500 p-5 rounded-lg shadow-2xl z-50 pointer-events-auto">
