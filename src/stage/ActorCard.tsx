@@ -32,8 +32,8 @@ const actorConfig: Record<
     description: 'OAuth 2.0 client application that needs access to user resources or third-party APIs.',
   },
   okta: {
-    title: 'Okta',
-    subtitle: 'Identity Provider',
+    title: 'Identity Provider',
+    subtitle: 'IdP',
     icon: Shield,
     badge: 'IDP',
     description: 'Authorization server that authenticates users and issues tokens.',
