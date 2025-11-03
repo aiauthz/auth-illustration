@@ -8,6 +8,10 @@ interface Node {
   y: number
   w?: number
   h?: number
+  roleLabel?: {
+    text: string
+    color: 'blue' | 'purple' | 'green' | 'orange'
+  }
 }
 
 interface NodeLayerProps {
@@ -39,7 +43,7 @@ function NodeComponent({ node, registerNode }: { node: Node; registerNode: (id: 
         opacity: 1,
       }}
     >
-      <ActorCard nodeId={node.id} />
+      <ActorCard nodeId={node.id} roleLabel={node.roleLabel} />
     </div>
   )
 }

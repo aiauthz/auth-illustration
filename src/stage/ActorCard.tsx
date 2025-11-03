@@ -7,6 +7,10 @@ import { HoverTooltip } from '@/components/HoverTooltip'
 
 interface ActorCardProps {
   nodeId: string
+  roleLabel?: {
+    text: string
+    color: 'blue' | 'purple' | 'green' | 'orange'
+  }
 }
 
 const actorConfig: Record<
@@ -65,8 +69,15 @@ const actorConfig: Record<
  * ActorCard - monochrome card component for actors
  * Always visible with explicit styling
  */
-export function ActorCard({ nodeId }: ActorCardProps) {
+export function ActorCard({ nodeId, roleLabel }: ActorCardProps) {
   const config = actorConfig[nodeId]
+  
+  const roleLabelColors = {
+    blue: 'bg-blue-600/90 border-blue-400',
+    purple: 'bg-purple-600/90 border-purple-400',
+    green: 'bg-green-600/90 border-green-400',
+    orange: 'bg-orange-600/90 border-orange-400',
+  }
   
   if (!config) {
     return (
@@ -81,29 +92,40 @@ export function ActorCard({ nodeId }: ActorCardProps) {
   const Icon = config.icon
 
   return (
-    <HoverTooltip
-      title={config.title}
-      description={config.description}
-    >
-      <Card className="bg-neutral-900 border-neutral-800 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] w-full hover:border-neutral-600 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] transition-all duration-200 cursor-help">
-        <CardContent className="flex flex-col items-center justify-center p-6 gap-3 min-h-[120px]">
-          <Icon className="h-8 w-8 text-neutral-200 flex-shrink-0" />
-          <div className="text-center">
-            <div className="text-lg font-semibold text-neutral-100">{config.title}</div>
-            {config.subtitle && (
-              <div className="text-xs text-neutral-400 mt-1">{config.subtitle}</div>
-            )}
+    <div className="relative w-full">
+      {/* Role Label - positioned above the card */}
+      {roleLabel && (
+        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 z-10">
+          <div className={`${roleLabelColors[roleLabel.color]} text-white px-4 py-2 rounded-lg shadow-lg text-sm font-semibold border whitespace-nowrap`}>
+            {roleLabel.text}
           </div>
-          {config.badge && (
-            <Badge
-              variant="outline"
-              className="border-neutral-700 bg-neutral-800 text-neutral-200 text-xs"
-            >
-              {config.badge}
-            </Badge>
-          )}
-        </CardContent>
-      </Card>
-    </HoverTooltip>
+        </div>
+      )}
+      
+      <HoverTooltip
+        title={config.title}
+        description={config.description}
+      >
+        <Card className="bg-neutral-900 border-neutral-800 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] w-full hover:border-neutral-600 hover:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] transition-all duration-200 cursor-help">
+          <CardContent className="flex flex-col items-center justify-center p-6 gap-3 min-h-[120px]">
+            <Icon className="h-8 w-8 text-neutral-200 flex-shrink-0" />
+            <div className="text-center">
+              <div className="text-lg font-semibold text-neutral-100">{config.title}</div>
+              {config.subtitle && (
+                <div className="text-xs text-neutral-400 mt-1">{config.subtitle}</div>
+              )}
+            </div>
+            {config.badge && (
+              <Badge
+                variant="outline"
+                className="border-neutral-700 bg-neutral-800 text-neutral-200 text-xs"
+              >
+                {config.badge}
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+      </HoverTooltip>
+    </div>
   )
 }

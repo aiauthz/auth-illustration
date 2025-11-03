@@ -9,6 +9,10 @@ interface Node {
   y: number
   w?: number
   h?: number
+  roleLabel?: {
+    text: string
+    color: 'blue' | 'purple' | 'green' | 'orange'
+  }
 }
 
 interface Edge {

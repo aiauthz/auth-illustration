@@ -73,8 +73,20 @@ export function Slide5_CrossAppAccess() {
   const nodes = [
     { id: 'user', x: 64, y: 180, w: 200 }, // Top left
     { id: 'okta', x: 480, y: 180, w: 240 }, // Top center-right (IdP)
-    { id: 'agent', x: 64, y: 420, w: 200 }, // Bottom left
-    { id: 'zoom', x: 920, y: 420, w: 240 }, // Bottom right (Zoom Resource Server)
+    { 
+      id: 'agent', 
+      x: 64, 
+      y: 420, 
+      w: 200,
+      roleLabel: { text: 'Requesting App', color: 'blue' as const }
+    }, // Bottom left
+    { 
+      id: 'zoom', 
+      x: 920, 
+      y: 420, 
+      w: 240,
+      roleLabel: { text: 'Resource App', color: 'purple' as const }
+    }, // Bottom right (Zoom Resource Server)
   ]
 
   const edges = [
@@ -352,18 +364,6 @@ export function Slide5_CrossAppAccess() {
         <h2 className="text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
           Cross App Access (Identity Assertion Authorization Grant)
         </h2>
-      </div>
-
-      {/* Role Labels - Positioned above actor cards */}
-      <div className="absolute left-[230px] top-[500px] z-50">
-        <div className="bg-blue-600/90 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-semibold border border-blue-400">
-          Requesting App
-        </div>
-      </div>
-      <div className="absolute left-[1280px] top-[500px] z-50">
-        <div className="bg-purple-600/90 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-semibold border border-purple-400">
-          Resource App
-        </div>
       </div>
 
       {/* Closed Caption - Bottom center */}
