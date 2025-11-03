@@ -466,19 +466,11 @@ export function Slide5_CrossAppAccess() {
               <ul className="space-y-3 text-sm text-neutral-200">
                 <li className="flex items-start gap-2">
                   <span className="text-green-400 font-bold mt-0.5">•</span>
-                  <span><strong>IdP visibility:</strong> Okta knows which agents have access through ID-JAG issuance</span>
+                  <span><strong>Admin visibility:</strong> Admins can now see which apps are sharing access tokens with AI agents</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-400 font-bold mt-0.5">•</span>
                   <span><strong>Centralized authorization:</strong> Okta controls access by issuing or denying ID-JAG</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold mt-0.5">•</span>
-                  <span><strong>Audit trail:</strong> All ID-JAG issuance logged at IdP for compliance</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold mt-0.5">•</span>
-                  <span><strong>Revocable:</strong> Okta can stop issuing ID-JAG to revoke agent access</span>
                 </li>
               </ul>
             </div>
