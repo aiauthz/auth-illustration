@@ -404,23 +404,35 @@ Authorization: Bearer ${zoomAccessToken?.substring(0, 20)}...
             </div>
           )}
 
-          {/* Scope Viewer - Bottom Right */}
-          {zoomAccessToken && (
+          {/* Token Display - Bottom Right */}
+          {(idToken || zoomAccessToken) && (
             <div className="absolute right-8 bottom-8 w-[320px] bg-neutral-900/95 border border-neutral-800 rounded-lg p-4 z-50 shadow-xl">
-              <h4 className="text-sm font-semibold mb-3 text-neutral-200">Active Scopes</h4>
-              <div className="flex flex-wrap gap-2">
-                {activeScopes.map((scope) => (
-                  <Badge key={scope} variant="secondary" className="text-xs bg-neutral-800 border-neutral-700 text-neutral-200">
-                    {scope}
-                  </Badge>
-                ))}
-              </div>
-              <div className="mt-4">
-                <TokenChip
-                  label="zoom_access_token"
-                  value={zoomAccessToken}
-                  scopes={['meeting.read', 'meeting.write']}
-                />
+              <h4 className="text-sm font-semibold mb-3 text-neutral-200">Tokens</h4>
+              <div className="flex flex-col gap-4">
+                {idToken && (
+                  <TokenChip
+                    label="ID Token (IDP)"
+                    value={idToken}
+                    scopes={['profile', 'email']}
+                  />
+                )}
+                {zoomAccessToken && (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <h5 className="text-xs font-semibold text-neutral-300 w-full mb-1">Active Scopes:</h5>
+                      {activeScopes.map((scope) => (
+                        <Badge key={scope} variant="secondary" className="text-xs bg-neutral-800 border-neutral-700 text-neutral-200">
+                          {scope}
+                        </Badge>
+                      ))}
+                    </div>
+                    <TokenChip
+                      label="Access Token (Zoom)"
+                      value={zoomAccessToken}
+                      scopes={['meeting.read', 'meeting.write']}
+                    />
+                  </>
+                )}
               </div>
             </div>
           )}
