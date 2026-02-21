@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState } from 'react'
 import { Stage } from '@/stage/Stage'
-import { Play, RotateCcw, ArrowRight, ArrowLeft, Copy, Check } from 'lucide-react'
+import { SlideLayout } from '@/components/SlideLayout'
+import { edgeColors } from '@/lib/colors'
+import { Copy, Check } from 'lucide-react'
 
 type FlowStep =
   | 'idle'
@@ -58,7 +59,7 @@ export function Slide3_DelegatedApiKey() {
       from: 'user',
       to: 'agent',
       label: 'Copy/Paste Zoom API Key',
-      color: '#f59e0b', // Orange - warning color
+      color: edgeColors.consent,
       visible: flowStep === 'user_shares_key',
     },
     {
@@ -66,7 +67,7 @@ export function Slide3_DelegatedApiKey() {
       from: 'user',
       to: 'agent',
       label: 'Key Stored in Agent',
-      color: '#ef4444', // Red - danger color
+      color: edgeColors.error,
       visible: flowStep === 'agent_receives_key',
     },
     {
@@ -74,7 +75,7 @@ export function Slide3_DelegatedApiKey() {
       from: 'agent',
       to: 'zoom',
       label: 'GET /recordings (Bearer zjwt_...)',
-      color: '#8b5cf6', // Purple
+      color: edgeColors.token,
       visible: flowStep === 'agent_makes_call',
     },
     {
@@ -82,7 +83,7 @@ export function Slide3_DelegatedApiKey() {
       from: 'zoom',
       to: 'agent',
       label: 'Meeting Recordings (200 OK)',
-      color: '#10b981', // Green
+      color: edgeColors.success,
       visible: flowStep === 'api_response',
     },
   ]
@@ -111,7 +112,6 @@ export function Slide3_DelegatedApiKey() {
         setFlowStep('api_response')
         break
       case 'api_response':
-        // Already at final step
         break
     }
   }
@@ -146,80 +146,18 @@ export function Slide3_DelegatedApiKey() {
 
   const canGoPrevious = flowStep !== 'idle'
 
-  // Listen for global next step event (from presentation clicker)
-  useEffect(() => {
-    const handleGlobalNextStep = () => {
-      if (flowStep === 'idle') {
-        handleStartFlow()
-      } else if (canGoNext) {
-        handleNextStep()
-      }
-    }
-
-    window.addEventListener('slideNextStep', handleGlobalNextStep)
-    return () => {
-      window.removeEventListener('slideNextStep', handleGlobalNextStep)
-    }
-  }, [flowStep, canGoNext])
-
   return (
-    <div className="flex flex-col w-full h-full relative">
-      {/* Control Buttons - Top left */}
-      <div className="absolute top-4 left-4 z-50 flex gap-4">
-        {flowStep === 'idle' ? (
-          <Button onClick={handleStartFlow} size="lg" className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 shadow-lg">
-            <Play className="h-5 w-5 mr-2" />
-            Start Flow
-          </Button>
-        ) : (
-          <>
-            <Button
-              onClick={handlePreviousStep}
-              disabled={!canGoPrevious}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Previous
-            </Button>
-            <Button
-              onClick={handleNextStep}
-              disabled={!canGoNext}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowRight className="h-5 w-5 mr-2" />
-              Next Step
-            </Button>
-            <Button onClick={handleReset} variant="outline" size="lg" className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800 shadow-lg">
-              <RotateCcw className="h-5 w-5 mr-2" />
-              Reset
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* Slide Title - Top center */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-        <h2 className="text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
-          Approach: Delegated API Key to AI Agent
-        </h2>
-      </div>
-
-      {/* Closed Caption - Bottom center */}
-      {flowStep !== 'idle' && stepMetadata[flowStep] && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
-          <div className="bg-black/90 text-white px-6 py-4 rounded-lg shadow-2xl border border-neutral-700">
-            <div className="flex items-start gap-4">
-              <div className="bg-neutral-700 text-neutral-100 px-3 py-1 rounded font-bold text-sm flex-shrink-0 mt-0.5">
-                {stepMetadata[flowStep]!.number}
-              </div>
-              <p className="text-base leading-relaxed">{stepMetadata[flowStep]!.caption}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <SlideLayout
+      title="Approach: Delegated API Key to AI Agent"
+      flowStep={flowStep}
+      stepMetadata={stepMetadata}
+      onStart={handleStartFlow}
+      onNext={handleNextStep}
+      onPrevious={handlePreviousStep}
+      onReset={handleReset}
+      canGoNext={canGoNext}
+      canGoPrevious={canGoPrevious}
+    >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
@@ -321,6 +259,6 @@ Content-Type: application/json
           )}
         </Stage>
       </div>
-    </div>
+    </SlideLayout>
   )
 }

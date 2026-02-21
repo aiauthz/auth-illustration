@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { ConsentDialog } from '@/components/ConsentDialog'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
+import { SlideLayout } from '@/components/SlideLayout'
 import { makeJwt } from '@/lib/tokens'
-import { Play, RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react'
+import { edgeColors } from '@/lib/colors'
 
 type FlowStep =
   | 'idle'
@@ -62,29 +62,24 @@ const stepMetadata: Record<FlowStep, { number: number; caption: string } | null>
 }
 
 /**
- * Slide 2: App-to-App via OAuth: Google Calendar ↔ Zoom
+ * Slide 2: App-to-App via OAuth: Google Calendar <-> Zoom
  * Full-screen Stage-based layout
  */
 export function Slide2_AppToApp() {
   const [showConsentDialog, setShowConsentDialog] = useState(false)
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
   const [zoomAccessToken, setZoomAccessToken] = useState<string | null>(null)
-  const [idToken, setIdToken] = useState<string | null>(null) // ID token from IDP (for identity verification only)
+  const [idToken, setIdToken] = useState<string | null>(null)
   const [isValidated, setIsValidated] = useState(false)
   const [meetingResponse, setMeetingResponse] = useState<{ id: string; join_url: string } | null>(
     null
   )
 
   const nodes = [
-    { id: 'calendar', x: 100, y: 320, w: 260 },  // Left side, lower - center: 230, 380, right edge: 360
-    { id: 'okta', x: 510, y: 80, w: 240 },       // Center top - center: 630, 140, bottom edge: 200
-    { id: 'zoom', x: 920, y: 320, w: 260 },      // Right side, lower - center: 1050, 380, left edge: 920
+    { id: 'calendar', x: 100, y: 320, w: 260 },
+    { id: 'okta', x: 510, y: 80, w: 240 },
+    { id: 'zoom', x: 920, y: 320, w: 260 },
   ]
-
-  // Token path calculations:
-  // Calendar <-> Zoom: horizontal at y=380 (x: 360 <-> 920)
-  // Zoom <-> Okta: diagonal path (from 1050,380 to 630,200) or (from 920,320 to 630,200)
-  // The EdgeLayer uses Manhattan routing, so paths are right-angled
 
   const edges = [
     {
@@ -92,7 +87,7 @@ export function Slide2_AppToApp() {
       from: 'calendar',
       to: 'zoom',
       label: 'Connect / Access Zoom',
-      color: '#60a5fa', // Blue
+      color: edgeColors.auth,
       visible: flowStep === 'calendar_to_zoom',
     },
     {
@@ -100,7 +95,7 @@ export function Slide2_AppToApp() {
       from: 'zoom',
       to: 'okta',
       label: 'SSO (OIDC)',
-      color: '#f59e0b', // Orange
+      color: edgeColors.consent,
       pulse: flowStep === 'zoom_sso_request',
       visible: flowStep === 'zoom_sso_request',
     },
@@ -109,7 +104,7 @@ export function Slide2_AppToApp() {
       from: 'okta',
       to: 'zoom',
       label: 'ID Token',
-      color: '#ec4899', // Pink
+      color: edgeColors.idToken,
       visible: flowStep === 'id_token_received',
     },
     {
@@ -117,7 +112,7 @@ export function Slide2_AppToApp() {
       from: 'calendar',
       to: 'zoom',
       label: 'Request Scopes (meeting.read, meeting.write)',
-      color: '#8b5cf6', // Purple
+      color: edgeColors.token,
       visible: flowStep === 'scope_request',
     },
     {
@@ -125,7 +120,7 @@ export function Slide2_AppToApp() {
       from: 'zoom',
       to: 'calendar',
       label: 'Access Token (Zoom)',
-      color: '#10b981', // Green
+      color: edgeColors.success,
       visible: flowStep === 'access_token_issued',
     },
     {
@@ -133,7 +128,7 @@ export function Slide2_AppToApp() {
       from: 'calendar',
       to: 'zoom',
       label: 'POST /meetings (Bearer ...)',
-      color: '#06b6d4', // Cyan
+      color: edgeColors.api,
       visible: flowStep === 'api_call',
     },
     {
@@ -141,7 +136,7 @@ export function Slide2_AppToApp() {
       from: 'zoom',
       to: 'calendar',
       label: 'Meeting Created (200 OK)',
-      color: '#22c55e', // Lime Green
+      color: edgeColors.successBright,
       visible: flowStep === 'api_response',
     },
   ]
@@ -159,27 +154,21 @@ export function Slide2_AppToApp() {
         setFlowStep('zoom_sso_request')
         break
       case 'zoom_sso_request':
-        // SSO happens, wait for validation
         setIsValidated(false)
         setFlowStep('idp_validates')
         break
       case 'idp_validates':
-        // Wait for validation to complete
         break
       case 'id_token_received':
-        // IDP returned ID token, now request scopes
         setFlowStep('scope_request')
         break
       case 'scope_request':
-        // Show consent dialog for scopes
         setFlowStep('consent_shown')
         setShowConsentDialog(true)
         break
       case 'consent_shown':
-        // Wait for user to grant consent
         break
       case 'access_token_issued':
-        // Zoom issued access token
         setFlowStep('api_call')
         break
       case 'api_call':
@@ -190,7 +179,6 @@ export function Slide2_AppToApp() {
         })
         break
       case 'api_response':
-        // Already at final step
         break
     }
   }
@@ -198,7 +186,6 @@ export function Slide2_AppToApp() {
   const handleAllow = () => {
     setShowConsentDialog(false)
     setFlowStep('access_token_issued')
-    // Zoom issues its own access token
     setZoomAccessToken(
       makeJwt({
         sub: 'google-calendar-app',
@@ -238,7 +225,7 @@ export function Slide2_AppToApp() {
         break
       case 'id_token_received':
         setIdToken(null)
-        setIsValidated(true) // Show validated state
+        setIsValidated(true)
         setFlowStep('idp_validates')
         break
       case 'idp_validates':
@@ -269,13 +256,13 @@ export function Slide2_AppToApp() {
   ]
 
   const activeScopes = zoomAccessToken ? ['meeting.read', 'meeting.write'] : []
-  const canGoNext = 
-    flowStep !== 'idle' && 
+  const canGoNext =
+    flowStep !== 'idle' &&
     flowStep !== 'idp_validates' &&
-    flowStep !== 'consent_shown' && 
+    flowStep !== 'consent_shown' &&
     flowStep !== 'api_response'
 
-  const canGoPrevious = 
+  const canGoPrevious =
     flowStep !== 'idle'
 
   // Auto-validate after showing validation spinner
@@ -283,7 +270,6 @@ export function Slide2_AppToApp() {
     if (flowStep === 'idp_validates' && !isValidated) {
       const timer = setTimeout(() => {
         setIsValidated(true)
-        // After validation completes, generate ID token and move to next step
         const newIdToken = makeJwt({
           sub: 'user@example.com',
           email: 'user@example.com',
@@ -291,91 +277,29 @@ export function Slide2_AppToApp() {
           aud: 'zoom-client-id',
         })
         setIdToken(newIdToken)
-        
-        // Auto-advance to id_token_received after validation
+
         setTimeout(() => {
           setFlowStep('id_token_received')
-        }, 1000) // Show validated state for 1 second before moving on
-      }, 1500) // Show validation spinner for 1.5 seconds
-      
+        }, 1000)
+      }, 1500)
+
       return () => clearTimeout(timer)
     }
   }, [flowStep, isValidated])
 
-  // Listen for global next step event (from presentation clicker)
-  useEffect(() => {
-    const handleGlobalNextStep = () => {
-      if (flowStep === 'idle') {
-        handleStartFlow()
-      } else if (canGoNext) {
-        handleNextStep()
-      }
-    }
-
-    window.addEventListener('slideNextStep', handleGlobalNextStep)
-    return () => {
-      window.removeEventListener('slideNextStep', handleGlobalNextStep)
-    }
-  }, [flowStep, canGoNext])
-
   return (
-    <div className="flex flex-col w-full h-full relative">
-      {/* Control Buttons - Top left */}
-      <div className="absolute top-4 left-4 z-50 flex gap-4">
-        {flowStep === 'idle' ? (
-          <Button onClick={handleStartFlow} size="lg" className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 shadow-lg">
-            <Play className="h-5 w-5 mr-2" />
-            Start OAuth Flow
-          </Button>
-        ) : (
-          <>
-            <Button
-              onClick={handlePreviousStep}
-              disabled={!canGoPrevious}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Previous
-            </Button>
-            <Button
-              onClick={handleNextStep}
-              disabled={!canGoNext}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowRight className="h-5 w-5 mr-2" />
-              Next Step
-            </Button>
-            <Button onClick={handleReset} variant="outline" size="lg" className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800 shadow-lg">
-              <RotateCcw className="h-5 w-5 mr-2" />
-              Reset
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* Slide Title - Top center */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-        <h2 className="text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
-          App-to-App Integration: Calendar ↔ Zoom
-        </h2>
-      </div>
-
-      {/* Closed Caption - Bottom center */}
-      {flowStep !== 'idle' && stepMetadata[flowStep] && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
-          <div className="bg-black/90 text-white px-6 py-4 rounded-lg shadow-2xl border border-neutral-700">
-            <div className="flex items-start gap-4">
-              <div className="bg-neutral-700 text-neutral-100 px-3 py-1 rounded font-bold text-sm flex-shrink-0 mt-0.5">
-                {stepMetadata[flowStep]!.number}
-              </div>
-              <p className="text-base leading-relaxed">{stepMetadata[flowStep]!.caption}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <SlideLayout
+      title="App-to-App Integration: Calendar ↔ Zoom"
+      flowStep={flowStep}
+      stepMetadata={stepMetadata}
+      onStart={handleStartFlow}
+      onNext={handleNextStep}
+      onPrevious={handlePreviousStep}
+      onReset={handleReset}
+      canGoNext={canGoNext}
+      canGoPrevious={canGoPrevious}
+      startLabel="Start OAuth Flow"
+    >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
@@ -461,6 +385,6 @@ Authorization: Bearer ${zoomAccessToken?.substring(0, 20)}...
         onDeny={handleDeny}
         variant="app-to-app"
       />
-    </div>
+    </SlideLayout>
   )
 }

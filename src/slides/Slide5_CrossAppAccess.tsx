@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
-import { Play, RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react'
+import { SlideLayout } from '@/components/SlideLayout'
 import { makeJwt } from '@/lib/tokens'
+import { edgeColors } from '@/lib/colors'
 
 type FlowStep =
   | 'idle'
@@ -73,122 +73,112 @@ export function Slide5_CrossAppAccess() {
 
   // Four actors in a specific layout
   const nodes = [
-    { id: 'user', x: 64, y: 180, w: 200 }, // Top left
-    { id: 'okta', x: 480, y: 180, w: 240 }, // Top center-right (IdP)
-    { 
-      id: 'agent', 
-      x: 64, 
-      y: 420, 
+    { id: 'user', x: 64, y: 180, w: 200 },
+    { id: 'okta', x: 480, y: 180, w: 240 },
+    {
+      id: 'agent',
+      x: 64,
+      y: 420,
       w: 200,
       roleLabel: { text: 'Requesting App', color: 'blue' as const }
-    }, // Bottom left
-    { 
-      id: 'zoom', 
-      x: 920, 
-      y: 420, 
+    },
+    {
+      id: 'zoom',
+      x: 920,
+      y: 420,
       w: 240,
       roleLabel: { text: 'Resource App', color: 'purple' as const }
-    }, // Bottom right (Zoom Resource Server)
+    },
   ]
 
   const edges = [
-    // Permanent connection: User to Agent (shows delegation relationship)
     {
       id: 'user-to-agent-delegation',
       from: 'agent',
       to: 'user',
       label: 'Works on behalf of User',
-      color: '#3b82f6', // Blue - matches grouping box
+      color: edgeColors.authBright,
       pulse: false,
-      visible: true, // Always visible
+      visible: true,
     },
-    // Step 1: Agent to Okta (SSO)
     {
       id: 'agent-to-idp-sso',
       from: 'agent',
       to: 'okta',
       label: 'SSO (OIDC',
-      color: '#60a5fa', // Blue
+      color: edgeColors.auth,
       pulse: flowStep === 'agent_sso',
       visible: flowStep === 'agent_sso',
     },
-    // Step 2: Okta to Agent (ID Token)
     {
       id: 'idp-to-agent-id-token',
       from: 'okta',
       to: 'agent',
       label: 'ID Token',
-      color: '#8b5cf6', // Purple
+      color: edgeColors.token,
       pulse: flowStep === 'idp_returns_id_token',
       visible: flowStep === 'idp_returns_id_token',
     },
-    // Step 3: Agent to Okta (Request ID-JAG with ID Token)
     {
       id: 'agent-to-idp-request-jag',
       from: 'agent',
       to: 'okta',
       label: 'Request ID-JAG',
-      color: '#f59e0b', // Orange
+      color: edgeColors.consent,
       pulse: flowStep === 'agent_requests_id_jag',
       visible: flowStep === 'agent_requests_id_jag',
     },
-    // Step 4: Okta to Agent (ID-JAG)
     {
       id: 'idp-to-agent-jag',
       from: 'okta',
       to: 'agent',
       label: 'ID-JAG',
-      color: '#10b981', // Green
+      color: edgeColors.success,
       pulse: flowStep === 'idp_issues_id_jag',
       visible: flowStep === 'idp_issues_id_jag',
     },
-    // Step 5: Agent to Zoom (Present ID-JAG)
     {
       id: 'agent-to-zoom-jag',
       from: 'agent',
       to: 'zoom',
       label: 'Present ID-JAG',
-      color: '#a855f7', // Purple variant
+      color: edgeColors.tokenAlt,
       pulse: flowStep === 'agent_presents_id_jag',
       visible: flowStep === 'agent_presents_id_jag',
     },
-    // Step 6: Zoom to Okta (Validate ID-JAG)
     {
       id: 'zoom-to-idp-validate',
       from: 'zoom',
       to: 'okta',
       label: 'Validate ID-JAG',
-      color: '#06b6d4', // Cyan
+      color: edgeColors.api,
       pulse: flowStep === 'zoom_validates_id_jag',
       visible: flowStep === 'zoom_validates_id_jag',
     },
-    // Step 7: Zoom to Agent (Access Token) - THE SOLUTION!
     {
       id: 'zoom-to-agent-token',
       from: 'zoom',
       to: 'agent',
       label: 'Access Token',
-      color: '#10b981', // Green - Zoom issues token but Okta aware!
+      color: edgeColors.success,
       pulse: flowStep === 'zoom_issues_access_token',
       visible: flowStep === 'zoom_issues_access_token',
     },
-    // Step 8: Agent to Zoom (API Call)
     {
       id: 'agent-to-zoom-api',
       from: 'agent',
       to: 'zoom',
       label: 'API Call',
-      color: '#f97316', // Orange
+      color: edgeColors.apiAlt,
       pulse: flowStep === 'agent_calls_api',
       visible: flowStep === 'agent_calls_api',
     },
-    // Step 9: Zoom to Agent (Response)
     {
       id: 'zoom-to-agent-response',
       from: 'zoom',
       to: 'agent',
       label: 'Response',
-      color: '#ec4899', // Pink
+      color: edgeColors.idToken,
       pulse: flowStep === 'zoom_responds',
       visible: flowStep === 'zoom_responds',
     },
@@ -205,10 +195,8 @@ export function Slide5_CrossAppAccess() {
         handleStartFlow()
         break
       case 'agent_sso':
-        // Wait for validation to complete
         break
       case 'idp_returns_id_token':
-        // Set ID token
         setIdToken(makeJwt({
           sub: 'user@example.com',
           email: 'user@example.com',
@@ -221,7 +209,6 @@ export function Slide5_CrossAppAccess() {
         setFlowStep('idp_issues_id_jag')
         break
       case 'idp_issues_id_jag':
-        // Set ID-JAG
         setIdJag(makeJwt({
           sub: 'user@example.com',
           iss: 'https://okta.example.com',
@@ -239,7 +226,6 @@ export function Slide5_CrossAppAccess() {
         setFlowStep('zoom_issues_access_token')
         break
       case 'zoom_issues_access_token':
-        // Set access token (issued by Zoom, but authorized by Okta via ID-JAG!)
         setAccessToken(makeJwt({
           sub: 'user@example.com',
           iss: 'https://zoom.example.com',
@@ -252,7 +238,6 @@ export function Slide5_CrossAppAccess() {
         setFlowStep('zoom_responds')
         break
       case 'zoom_responds':
-        // Final step
         break
     }
   }
@@ -263,7 +248,6 @@ export function Slide5_CrossAppAccess() {
         setFlowStep('agent_calls_api')
         break
       case 'agent_calls_api':
-        // Clear access token when going back before it was issued
         setAccessToken(null)
         setFlowStep('zoom_issues_access_token')
         break
@@ -277,7 +261,6 @@ export function Slide5_CrossAppAccess() {
         setFlowStep('idp_issues_id_jag')
         break
       case 'idp_issues_id_jag':
-        // Clear ID-JAG when going back before it was issued
         setIdJag(null)
         setFlowStep('agent_requests_id_jag')
         break
@@ -285,9 +268,8 @@ export function Slide5_CrossAppAccess() {
         setFlowStep('idp_returns_id_token')
         break
       case 'idp_returns_id_token':
-        // Clear ID token when going back before it was issued
         setIdToken(null)
-        setIsValidated(true) // Show validated state
+        setIsValidated(true)
         setFlowStep('agent_sso')
         break
       case 'agent_sso':
@@ -305,12 +287,12 @@ export function Slide5_CrossAppAccess() {
     setIsValidated(false)
   }
 
-  const canGoNext = 
-    flowStep !== 'idle' && 
+  const canGoNext =
+    flowStep !== 'idle' &&
     flowStep !== 'agent_sso' &&
     flowStep !== 'zoom_responds'
 
-  const canGoPrevious = 
+  const canGoPrevious =
     flowStep !== 'idle'
 
   // Auto-validate after showing validation spinner
@@ -318,90 +300,27 @@ export function Slide5_CrossAppAccess() {
     if (flowStep === 'agent_sso' && !isValidated) {
       const timer = setTimeout(() => {
         setIsValidated(true)
-        // After validation completes, move to next step
         setTimeout(() => {
           setFlowStep('idp_returns_id_token')
-        }, 1000) // Show validated state for 1 second before moving on
-      }, 1500) // Show validation spinner for 1.5 seconds
-      
+        }, 1000)
+      }, 1500)
+
       return () => clearTimeout(timer)
     }
   }, [flowStep, isValidated])
 
-  // Listen for global next step event (from presentation clicker)
-  useEffect(() => {
-    const handleGlobalNextStep = () => {
-      if (flowStep === 'idle') {
-        handleStartFlow()
-      } else if (canGoNext) {
-        handleNextStep()
-      }
-    }
-
-    window.addEventListener('slideNextStep', handleGlobalNextStep)
-    return () => {
-      window.removeEventListener('slideNextStep', handleGlobalNextStep)
-    }
-  }, [flowStep, canGoNext])
-
   return (
-    <div className="flex flex-col w-full h-full relative">
-      {/* Control Buttons - Top left */}
-      <div className="absolute top-4 left-4 z-50 flex gap-4">
-        {flowStep === 'idle' ? (
-          <Button onClick={handleStartFlow} size="lg" className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 shadow-lg">
-            <Play className="h-5 w-5 mr-2" />
-            Start Flow
-          </Button>
-        ) : (
-          <>
-            <Button
-              onClick={handlePreviousStep}
-              disabled={!canGoPrevious}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Previous
-            </Button>
-            <Button
-              onClick={handleNextStep}
-              disabled={!canGoNext}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowRight className="h-5 w-5 mr-2" />
-              Next Step
-            </Button>
-            <Button onClick={handleReset} variant="outline" size="lg" className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800 shadow-lg">
-              <RotateCcw className="h-5 w-5 mr-2" />
-              Reset
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* Slide Title - Top center */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-        <h2 className="text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
-          Cross App Access (Identity Assertion Authorization Grant)
-        </h2>
-      </div>
-
-      {/* Closed Caption - Bottom center */}
-      {flowStep !== 'idle' && stepMetadata[flowStep] && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
-          <div className="bg-black/90 text-white px-6 py-4 rounded-lg shadow-2xl border border-neutral-700">
-            <div className="flex items-start gap-4">
-              <div className="bg-neutral-700 text-neutral-100 px-3 py-1 rounded font-bold text-sm flex-shrink-0 mt-0.5">
-                {stepMetadata[flowStep]!.number}
-              </div>
-              <p className="text-base leading-relaxed">{stepMetadata[flowStep]!.caption}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <SlideLayout
+      title="Cross App Access (Identity Assertion Authorization Grant)"
+      flowStep={flowStep}
+      stepMetadata={stepMetadata}
+      onStart={handleStartFlow}
+      onNext={handleNextStep}
+      onPrevious={handlePreviousStep}
+      onReset={handleReset}
+      canGoNext={canGoNext}
+      canGoPrevious={canGoPrevious}
+    >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
@@ -409,9 +328,6 @@ export function Slide5_CrossAppAccess() {
           {flowStep === 'agent_sso' && (
             <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" position="top" />
           )}
-
-          {/* User & Agent Grouping Rectangle - Shows they're working together */}
-          
 
           {/* ID-JAG Explanation Box - Shows during Step 4 */}
           {flowStep === 'idp_issues_id_jag' && (
@@ -457,7 +373,7 @@ export function Slide5_CrossAppAccess() {
                     <span className="font-semibold">ID Token received</span>
                   </div>
                 )}
-                
+
                 {/* ID-JAG - Show full chip when active, checkmark when complete */}
                 {idJag && (flowStep === 'idp_issues_id_jag' || flowStep === 'agent_presents_id_jag' || flowStep === 'zoom_validates_id_jag') ? (
                   <TokenChip
@@ -471,7 +387,7 @@ export function Slide5_CrossAppAccess() {
                     <span className="font-semibold">ID-JAG received</span>
                   </div>
                 )}
-                
+
                 {/* Access Token - Show full chip when active, checkmark when used */}
                 {accessToken && flowStep === 'zoom_issues_access_token' ? (
                   <TokenChip
@@ -517,6 +433,6 @@ export function Slide5_CrossAppAccess() {
           )}
         </Stage>
       </div>
-    </div>
+    </SlideLayout>
   )
 }

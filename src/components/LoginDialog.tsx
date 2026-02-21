@@ -14,14 +14,26 @@ interface LoginDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onLogin: (username: string, password: string) => void
+  title?: string
+  description?: string
+  defaultUsername?: string
+  defaultPassword?: string
 }
 
 /**
  * Login Dialog - user enters username and password
  */
-export function LoginDialog({ open, onOpenChange, onLogin }: LoginDialogProps) {
-  const [username, setUsername] = useState('alex.chen@techcorp.com')
-  const [password, setPassword] = useState('SecurePass123!')
+export function LoginDialog({
+  open,
+  onOpenChange,
+  onLogin,
+  title = 'Sign in to Okta',
+  description = 'Enter your credentials to continue',
+  defaultUsername = 'alex.chen@techcorp.com',
+  defaultPassword = 'SecurePass123!',
+}: LoginDialogProps) {
+  const [username, setUsername] = useState(defaultUsername)
+  const [password, setPassword] = useState(defaultPassword)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,9 +47,9 @@ export function LoginDialog({ open, onOpenChange, onLogin }: LoginDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-100 sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold text-neutral-100">Sign in to Okta</DialogTitle>
+          <DialogTitle className="text-xl font-semibold text-neutral-100">{title}</DialogTitle>
           <DialogDescription className="text-neutral-400">
-            Enter your credentials to continue
+            {description}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">

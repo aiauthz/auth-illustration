@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { LoginDialog } from '@/components/LoginDialog'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
+import { SlideLayout } from '@/components/SlideLayout'
 import { makeJwt } from '@/lib/tokens'
-import { Play, RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react'
+import { edgeColors } from '@/lib/colors'
 
 type FlowStep =
   | 'idle'
@@ -55,23 +55,17 @@ export function Slide1_OAuthConsent() {
 
   const nodes = [
     { id: 'user', x: 64, y: 240, w: 220 },
-    { id: 'calendar', x: 480, y: 240, w: 260 }, 
-    { id: 'okta', x: 1000, y: 240, w: 240 }, // Increased distance for better arrow visibility
+    { id: 'calendar', x: 480, y: 240, w: 260 },
+    { id: 'okta', x: 1000, y: 240, w: 240 },
   ]
 
-  // Calculate token positions based on node centers
-  // calendar: x=400, w=260 -> center at 530, right edge at 660
-  // okta: x=920, w=240 -> center at 1040, left edge at 920
-  // All nodes at y=240, h≈120 -> center at y≈300
-
-  // Each arrow is visible only at its specific step - no overlapping
   const edges = [
     {
       id: 'user-to-calendar',
       from: 'user',
       to: 'calendar',
       label: 'Clicks "Sign in"',
-      color: '#3b82f6', // Bright Blue
+      color: edgeColors.authBright,
       pulse: flowStep === 'user_clicks_login',
       visible: flowStep === 'user_clicks_login',
     },
@@ -80,18 +74,18 @@ export function Slide1_OAuthConsent() {
       from: 'calendar',
       to: 'okta',
       label: 'SSO (OIDC)',
-      color: '#60a5fa', // Blue
+      color: edgeColors.auth,
       pulse: flowStep === 'auth_request',
-      visible: flowStep === 'auth_request', // Only visible at this step
+      visible: flowStep === 'auth_request',
     },
     {
       id: 'okta-to-calendar-token',
       from: 'okta',
       to: 'calendar',
       label: 'ID Token',
-      color: '#ec4899', // Pink
+      color: edgeColors.idToken,
       pulse: flowStep === 'tokens_received',
-      visible: flowStep === 'tokens_received', // Only visible at this step
+      visible: flowStep === 'tokens_received',
     },
   ]
 
@@ -105,19 +99,15 @@ export function Slide1_OAuthConsent() {
         handleStartOAuth()
         break
       case 'user_clicks_login':
-        // User clicked login, now Calendar initiates SSO
         setFlowStep('auth_request')
         break
       case 'auth_request':
-        // After SSO request, show login dialog
         setFlowStep('login_shown')
         setShowLoginDialog(true)
         break
       case 'login_shown':
-        // Wait for user to login
         break
-      case 'idp_validates':
-        // IDP validates identity and returns ID token
+      case 'idp_validates': {
         const newIdToken = makeJwt({
           sub: username || 'user@example.com',
           email: username || 'user@example.com',
@@ -127,8 +117,8 @@ export function Slide1_OAuthConsent() {
         setIdToken(newIdToken)
         setFlowStep('tokens_received')
         break
+      }
       case 'tokens_received':
-        // Already received, do nothing
         break
     }
   }
@@ -137,7 +127,7 @@ export function Slide1_OAuthConsent() {
     switch (flowStep) {
       case 'tokens_received':
         setIdToken(null)
-        setIsValidated(true) // Show validated state when going back
+        setIsValidated(true)
         setFlowStep('idp_validates')
         break
       case 'idp_validates':
@@ -173,13 +163,12 @@ export function Slide1_OAuthConsent() {
     setIsValidated(false)
   }
 
-  // Can go to next step if not idle, not waiting for dialog, and not at final step
-  const canGoNext = 
-    flowStep !== 'idle' && 
-    flowStep !== 'login_shown' && 
+  const canGoNext =
+    flowStep !== 'idle' &&
+    flowStep !== 'login_shown' &&
     flowStep !== 'tokens_received'
 
-  const canGoPrevious = 
+  const canGoPrevious =
     flowStep !== 'idle'
 
   // Auto-validate after showing validation spinner
@@ -187,86 +176,25 @@ export function Slide1_OAuthConsent() {
     if (flowStep === 'idp_validates' && !isValidated) {
       const timer = setTimeout(() => {
         setIsValidated(true)
-      }, 1500) // Show validation spinner for 1.5 seconds before showing checkmark
-      
+      }, 1500)
+
       return () => clearTimeout(timer)
     }
   }, [flowStep, isValidated])
 
-  // Listen for global next step event (from presentation clicker)
-  useEffect(() => {
-    const handleGlobalNextStep = () => {
-      if (flowStep === 'idle') {
-        handleStartOAuth()
-      } else if (canGoNext) {
-        handleNextStep()
-      }
-    }
-
-    window.addEventListener('slideNextStep', handleGlobalNextStep)
-    return () => {
-      window.removeEventListener('slideNextStep', handleGlobalNextStep)
-    }
-  }, [flowStep, canGoNext])
-
   return (
-    <div className="flex flex-col w-full h-full relative">
-      {/* Control Buttons - Top left */}
-      <div className="absolute top-4 left-4 z-50 flex gap-4">
-        {flowStep === 'idle' ? (
-          <Button onClick={handleStartOAuth} size="lg" className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 shadow-lg">
-            <Play className="h-5 w-5 mr-2" />
-            Start OAuth Flow
-          </Button>
-        ) : (
-          <>
-            <Button
-              onClick={handlePreviousStep}
-              disabled={!canGoPrevious}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Previous
-            </Button>
-            <Button
-              onClick={handleNextStep}
-              disabled={!canGoNext}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowRight className="h-5 w-5 mr-2" />
-              Next Step
-            </Button>
-            <Button onClick={handleReset} variant="outline" size="lg" className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800 shadow-lg">
-              <RotateCcw className="h-5 w-5 mr-2" />
-              Reset
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* Slide Title - Top center */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-        <h2 className="text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
-          Basic OIDC Authentication Flow
-        </h2>
-      </div>
-
-      {/* Closed Caption - Bottom center */}
-      {flowStep !== 'idle' && stepMetadata[flowStep] && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
-          <div className="bg-black/90 text-white px-6 py-4 rounded-lg shadow-2xl border border-neutral-700">
-            <div className="flex items-start gap-4">
-              <div className="bg-neutral-700 text-neutral-100 px-3 py-1 rounded font-bold text-sm flex-shrink-0 mt-0.5">
-                {stepMetadata[flowStep]!.number}
-              </div>
-              <p className="text-base leading-relaxed">{stepMetadata[flowStep]!.caption}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <SlideLayout
+      title="Basic OIDC Authentication Flow"
+      flowStep={flowStep}
+      stepMetadata={stepMetadata}
+      onStart={handleStartOAuth}
+      onNext={handleNextStep}
+      onPrevious={handlePreviousStep}
+      onReset={handleReset}
+      canGoNext={canGoNext}
+      canGoPrevious={canGoPrevious}
+      startLabel="Start OAuth Flow"
+    >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
@@ -300,6 +228,6 @@ export function Slide1_OAuthConsent() {
         onOpenChange={setShowLoginDialog}
         onLogin={handleLogin}
       />
-    </div>
+    </SlideLayout>
   )
 }

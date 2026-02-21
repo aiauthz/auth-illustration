@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { ConsentDialog } from '@/components/ConsentDialog'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
-import { Play, RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react'
+import { SlideLayout } from '@/components/SlideLayout'
+import { edgeColors } from '@/lib/colors'
 
 type FlowStep =
   | 'idle'
@@ -88,110 +88,100 @@ export function Slide4_AgentAsOAuthClient() {
 
   // Four actors in a specific layout matching the diagram
   const nodes = [
-    { id: 'user', x: 64, y: 180, w: 200 }, // Top left - moved down
-    { id: 'okta', x: 480, y: 180, w: 240 }, // Top center-right (IdP) - moved down
-    { id: 'agent', x: 64, y: 420, w: 200 }, // Bottom left - moved down
-    { id: 'zoom', x: 920, y: 420, w: 240 }, // Bottom right (Zoom Resource Server) - moved down
+    { id: 'user', x: 64, y: 180, w: 200 },
+    { id: 'okta', x: 480, y: 180, w: 240 },
+    { id: 'agent', x: 64, y: 420, w: 200 },
+    { id: 'zoom', x: 920, y: 420, w: 240 },
   ]
 
   const edges = [
-    // Permanent connection: User to Agent (shows delegation relationship)
     {
       id: 'user-to-agent-delegation',
       from: 'agent',
       to: 'user',
       label: 'Works on behalf of User',
-      color: '#3b82f6', // Blue - matches grouping box
+      color: edgeColors.authBright,
       pulse: false,
-      visible: true, // Always visible
+      visible: true,
     },
-    // Step 1: Agent to Okta (SSO on behalf of user)
     {
       id: 'agent-to-idp-sso',
       from: 'agent',
       to: 'okta',
       label: 'SSO (OIDC)',
-      color: '#60a5fa', // Blue
+      color: edgeColors.auth,
       pulse: flowStep === 'user_sso',
       visible: flowStep === 'user_sso',
     },
-    // Step 2: Okta to Agent (ID Token)
     {
       id: 'idp-to-agent-id-token',
       from: 'okta',
       to: 'agent',
       label: 'id_token',
-      color: '#8b5cf6', // Purple
+      color: edgeColors.token,
       pulse: flowStep === 'idp_returns_id_token',
       visible: flowStep === 'idp_returns_id_token',
     },
-    // Step 3: Agent to Zoom (Request Resources)
     {
       id: 'agent-to-zoom-request',
       from: 'agent',
       to: 'zoom',
       label: 'Request Zoom Resources',
-      color: '#f59e0b', // Orange
+      color: edgeColors.consent,
       pulse: flowStep === 'agent_requests_zoom',
       visible: flowStep === 'agent_requests_zoom',
     },
-    // Step 4: Zoom to IDP (Verify Identity)
     {
       id: 'zoom-to-idp-verify',
       from: 'zoom',
       to: 'okta',
       label: 'SSO (OIDC)',
-      color: '#10b981', // Green
+      color: edgeColors.success,
       pulse: flowStep === 'zoom_redirects_to_idp',
       visible: flowStep === 'zoom_redirects_to_idp',
     },
-    // Step 5: IDP to Zoom (Return ID Token)
     {
       id: 'idp-to-zoom-id-token',
       from: 'okta',
       to: 'zoom',
       label: 'id_token',
-      color: '#ec4899', // Pink
+      color: edgeColors.idToken,
       pulse: flowStep === 'idp_returns_id_token_to_zoom',
       visible: flowStep === 'idp_returns_id_token_to_zoom',
     },
-    // Step 6: Agent to Zoom (Request Scopes)
     {
       id: 'agent-to-zoom-scopes',
       from: 'agent',
       to: 'zoom',
       label: 'Request Scopes (read, write)',
-      color: '#a855f7', // Purple
+      color: edgeColors.tokenAlt,
       pulse: flowStep === 'agent_requests_scopes',
       visible: flowStep === 'agent_requests_scopes',
     },
-    // Step 6: Zoom to Agent (Access Token) - THE PROBLEM!
     {
       id: 'zoom-to-agent-token',
       from: 'zoom',
       to: 'agent',
       label: 'access_token',
-      color: '#ef4444', // RED - This is the problem!
+      color: edgeColors.error,
       pulse: flowStep === 'zoom_issues_access_token',
       visible: flowStep === 'zoom_issues_access_token',
     },
-    // Step 7: Agent to Zoom (API Call with token)
     {
       id: 'agent-to-zoom-api',
       from: 'agent',
       to: 'zoom',
       label: 'API Call using access_token',
-      color: '#06b6d4', // Cyan
+      color: edgeColors.api,
       pulse: flowStep === 'agent_calls_api',
       visible: flowStep === 'agent_calls_api',
     },
-    // Step 8: Zoom to Agent (Response)
     {
       id: 'zoom-to-agent-response',
       from: 'zoom',
       to: 'agent',
       label: 'Response',
-      color: '#ec4899', // Pink
+      color: edgeColors.idToken,
       pulse: flowStep === 'zoom_responds',
       visible: flowStep === 'zoom_responds',
     },
@@ -208,44 +198,34 @@ export function Slide4_AgentAsOAuthClient() {
         handleStartFlow()
         break
       case 'user_sso':
-        // Show validation indicator
         setIsValidated(false)
         setFlowStep('idp_validates')
         break
       case 'idp_validates':
-        // Wait for validation to complete (auto-advances)
         break
       case 'idp_returns_id_token':
-        // Set ID token
         setIdToken('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...')
         setFlowStep('agent_requests_zoom')
         break
       case 'agent_requests_zoom':
-        // Zoom redirects to IDP to verify identity
         setFlowStep('zoom_redirects_to_idp')
         break
       case 'zoom_redirects_to_idp':
-        // Show validation indicator
         setIsValidated(false)
         setFlowStep('idp_validates_identity')
         break
       case 'idp_validates_identity':
-        // Wait for validation to complete (auto-advances)
         break
       case 'idp_returns_id_token_to_zoom':
-        // IDP returns ID token to Zoom
         setFlowStep('agent_requests_scopes')
         break
       case 'agent_requests_scopes':
-        // Agent requests scopes from Zoom
         setFlowStep('consent_shown')
         setShowConsentDialog(true)
         break
       case 'consent_shown':
-        // Wait for user to grant consent
         break
       case 'zoom_issues_access_token':
-        // Set access token (issued by Zoom directly, IDP not involved!)
         setAccessToken('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6InJlYWQud3JpdGUifQ...')
         setFlowStep('agent_calls_api')
         break
@@ -253,7 +233,6 @@ export function Slide4_AgentAsOAuthClient() {
         setFlowStep('zoom_responds')
         break
       case 'zoom_responds':
-        // Final step
         break
     }
   }
@@ -279,7 +258,7 @@ export function Slide4_AgentAsOAuthClient() {
         setFlowStep('idp_returns_id_token_to_zoom')
         break
       case 'idp_returns_id_token_to_zoom':
-        setIsValidated(true) // Show validated state
+        setIsValidated(true)
         setFlowStep('idp_validates_identity')
         break
       case 'idp_validates_identity':
@@ -294,7 +273,7 @@ export function Slide4_AgentAsOAuthClient() {
         setFlowStep('idp_returns_id_token')
         break
       case 'idp_returns_id_token':
-        setIsValidated(true) // Show validated state
+        setIsValidated(true)
         setFlowStep('idp_validates')
         break
       case 'idp_validates':
@@ -333,14 +312,14 @@ export function Slide4_AgentAsOAuthClient() {
     { key: 'meetings.write', description: 'Create & update meetings' },
   ]
 
-  const canGoNext = 
+  const canGoNext =
     flowStep !== 'idle' &&
     flowStep !== 'idp_validates' &&
     flowStep !== 'idp_validates_identity' &&
     flowStep !== 'consent_shown' &&
     flowStep !== 'zoom_responds'
 
-  const canGoPrevious = 
+  const canGoPrevious =
     flowStep !== 'idle'
 
   // Auto-validate after showing validation spinner
@@ -348,102 +327,38 @@ export function Slide4_AgentAsOAuthClient() {
     if (flowStep === 'idp_validates' && !isValidated) {
       const timer = setTimeout(() => {
         setIsValidated(true)
-        // After validation completes, move to next step
         setTimeout(() => {
           setFlowStep('idp_returns_id_token')
-        }, 1000) // Show validated state for 1 second before moving on
-      }, 1500) // Show validation spinner for 1.5 seconds
-      
+        }, 1000)
+      }, 1500)
+
       return () => clearTimeout(timer)
     }
-    
+
     if (flowStep === 'idp_validates_identity' && !isValidated) {
       const timer = setTimeout(() => {
         setIsValidated(true)
-        // After identity validation, IDP returns ID token to Zoom
         setTimeout(() => {
           setFlowStep('idp_returns_id_token_to_zoom')
-        }, 1000) // Show validated state for 1 second before returning ID token
-      }, 1500) // Show validation spinner for 1.5 seconds
-      
+        }, 1000)
+      }, 1500)
+
       return () => clearTimeout(timer)
     }
   }, [flowStep, isValidated])
 
-  // Listen for global next step event (from presentation clicker)
-  useEffect(() => {
-    const handleGlobalNextStep = () => {
-      if (flowStep === 'idle') {
-        handleStartFlow()
-      } else if (canGoNext) {
-        handleNextStep()
-      }
-    }
-
-    window.addEventListener('slideNextStep', handleGlobalNextStep)
-    return () => {
-      window.removeEventListener('slideNextStep', handleGlobalNextStep)
-    }
-  }, [flowStep, canGoNext])
-
   return (
-    <div className="flex flex-col w-full h-full relative">
-      {/* Control Buttons - Top left */}
-      <div className="absolute top-4 left-4 z-50 flex gap-4">
-        {flowStep === 'idle' ? (
-          <Button onClick={handleStartFlow} size="lg" className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 shadow-lg">
-            <Play className="h-5 w-5 mr-2" />
-            Start Flow
-          </Button>
-        ) : (
-          <>
-            <Button
-              onClick={handlePreviousStep}
-              disabled={!canGoPrevious}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Previous
-            </Button>
-            <Button
-              onClick={handleNextStep}
-              disabled={!canGoNext}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
-            >
-              <ArrowRight className="h-5 w-5 mr-2" />
-              Next Step
-            </Button>
-            <Button onClick={handleReset} variant="outline" size="lg" className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800 shadow-lg">
-              <RotateCcw className="h-5 w-5 mr-2" />
-              Reset
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* Slide Title - Top center */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-        <h2 className="text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
-          Approach: AI Agent as a Registered OAuth Client
-        </h2>
-      </div>
-
-      {/* Closed Caption - Bottom center */}
-      {flowStep !== 'idle' && stepMetadata[flowStep] && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
-          <div className="bg-black/90 text-white px-6 py-4 rounded-lg shadow-2xl border border-neutral-700">
-            <div className="flex items-start gap-4">
-              <div className="bg-neutral-700 text-neutral-100 px-3 py-1 rounded font-bold text-sm flex-shrink-0 mt-0.5">
-                {stepMetadata[flowStep]!.number}
-              </div>
-              <p className="text-base leading-relaxed">{stepMetadata[flowStep]!.caption}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <SlideLayout
+      title="Approach: AI Agent as a Registered OAuth Client"
+      flowStep={flowStep}
+      stepMetadata={stepMetadata}
+      onStart={handleStartFlow}
+      onNext={handleNextStep}
+      onPrevious={handlePreviousStep}
+      onReset={handleReset}
+      canGoNext={canGoNext}
+      canGoPrevious={canGoPrevious}
+    >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
@@ -486,7 +401,7 @@ export function Slide4_AgentAsOAuthClient() {
                   IdP is unaware of token exchange
                 </p>
                 <p className="text-sm text-neutral-300">
-                  When Zoom issues the access token to the AI Agent, <strong>Okta (IdP) has no visibility</strong> into this transaction. 
+                  When Zoom issues the access token to the AI Agent, <strong>Okta (IdP) has no visibility</strong> into this transaction.
                   The IdP only sees that the user logged in, but doesn't know an AI Agent is receiving access tokens.
                 </p>
               </div>
@@ -505,6 +420,6 @@ export function Slide4_AgentAsOAuthClient() {
           />
         </Stage>
       </div>
-    </div>
+    </SlideLayout>
   )
 }

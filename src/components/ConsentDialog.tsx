@@ -22,6 +22,8 @@ interface ConsentDialogProps {
   onAllow: () => void
   onDeny: () => void
   variant?: 'default' | 'app-to-app'
+  title?: string
+  description?: string
 }
 
 /**
@@ -35,6 +37,8 @@ export function ConsentDialog({
   onAllow,
   onDeny,
   variant = 'default',
+  title: titleOverride,
+  description: descriptionOverride,
 }: ConsentDialogProps) {
   const handleAllow = () => {
     onAllow()
@@ -46,10 +50,17 @@ export function ConsentDialog({
     onOpenChange(false)
   }
 
-  const title =
+  const title = titleOverride ?? (
     variant === 'app-to-app'
       ? `Google Calendar wants to access ${appName} API`
       : `${appName} wants access`
+  )
+
+  const description = descriptionOverride ?? (
+    variant === 'app-to-app'
+      ? 'This will allow the app to access these permissions on your behalf.'
+      : 'Review the permissions that this app is requesting.'
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,9 +68,7 @@ export function ConsentDialog({
         <DialogHeader>
           <DialogTitle className="text-neutral-100">{title}</DialogTitle>
           <DialogDescription className="text-neutral-400">
-            {variant === 'app-to-app'
-              ? 'This will allow the app to access these permissions on your behalf.'
-              : 'Review the permissions that this app is requesting.'}
+            {description}
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
