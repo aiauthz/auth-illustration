@@ -151,10 +151,10 @@ export function Stage({ nodes, edges, children, className }: StageProps) {
           <GridLayer />
           <NodeLayer nodes={nodes} />
           <EdgeLayer edges={edges} />
-        </div>
-        {/* Children positioned relative to viewport, not scaled canvas */}
-        <div className="absolute inset-0 z-40 pointer-events-none" style={{ pointerEvents: 'none' }}>
-          {children}
+          {/* Children positioned within the scaled 1280×720 canvas */}
+          <div className="absolute inset-0 z-40 pointer-events-none">
+            {children}
+          </div>
         </div>
       </div>
     </StageContext.Provider>

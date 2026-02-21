@@ -21,7 +21,7 @@ export function ValidationIndicatorPositioned({
   validatingSubtext,
   validatedSubtext,
 }: ValidationIndicatorPositionedProps) {
-  const { nodeRefs, scale } = useStage()
+  const { nodeRefs } = useStage()
   const [pos, setPos] = useState({ left: 0, top: 0 })
   const [transform, setTransform] = useState('translate(-50%, -100%)')
 
@@ -29,20 +29,23 @@ export function ValidationIndicatorPositioned({
     const updatePosition = () => {
       const nodeRef = nodeRefs.get(nodeId)
       if (nodeRef?.current) {
-        const rect = nodeRef.current.getBoundingClientRect()
-        const centerX = rect.left + rect.width / 2
-        const centerY = rect.top + rect.height / 2
-        const rightX = rect.right
-        const topY = rect.top
-        const bottomY = rect.bottom
-        const leftX = rect.left
-        
+        const el = nodeRef.current
+        const nodeLeft = parseFloat(el.style.left) || 0
+        const nodeTop = parseFloat(el.style.top) || 0
+        const nodeWidth = el.offsetWidth
+        const nodeHeight = el.offsetHeight
+
+        const centerX = nodeLeft + nodeWidth / 2
+        const centerY = nodeTop + nodeHeight / 2
+        const rightX = nodeLeft + nodeWidth
+        const bottomY = nodeTop + nodeHeight
+
         let newPos = { left: 0, top: 0 }
         let newTransform = ''
-        
+
         switch (position) {
           case 'top':
-            newPos = { left: centerX, top: topY - 20 }
+            newPos = { left: centerX, top: nodeTop - 20 }
             newTransform = 'translate(-50%, -100%)'
             break
           case 'right':
@@ -54,26 +57,25 @@ export function ValidationIndicatorPositioned({
             newTransform = 'translate(-50%, 0)'
             break
           case 'left':
-            newPos = { left: leftX - 20, top: centerY }
+            newPos = { left: nodeLeft - 20, top: centerY }
             newTransform = 'translate(-100%, -50%)'
             break
         }
-        
+
         setPos(newPos)
         setTransform(newTransform)
       }
     }
 
-    // Update position initially and on resize
     updatePosition()
-    const timer = setInterval(updatePosition, 100) // Poll for position updates
+    const timer = setInterval(updatePosition, 100)
 
     return () => clearInterval(timer)
-  }, [nodeId, nodeRefs, scale, position])
+  }, [nodeId, nodeRefs, position])
 
   return (
     <div
-      className="fixed z-50 pointer-events-none"
+      className="absolute z-50 pointer-events-none"
       style={{
         left: `${pos.left}px`,
         top: `${pos.top}px`,

@@ -60,44 +60,44 @@ export function SlideLayout({
   return (
     <div className="flex flex-col w-full h-full relative">
       {/* Control Buttons - Top left */}
-      <div className="absolute top-4 left-4 z-50 flex gap-4">
+      <div className="absolute top-4 left-4 z-50 flex gap-2 lg:gap-4">
         {isIdle ? (
           <Button
             onClick={onStart}
-            size="lg"
-            className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 shadow-lg"
+            size="default"
+            className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 shadow-lg lg:text-base lg:px-4 lg:py-2"
           >
-            <Play className="h-5 w-5 mr-2" />
-            {startLabel}
+            <Play className="h-4 w-4 lg:h-5 lg:w-5 lg:mr-2" />
+            <span className="hidden lg:inline">{startLabel}</span>
           </Button>
         ) : (
           <>
             <Button
               onClick={onPrevious}
               disabled={!canGoPrevious}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
+              size="default"
+              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg lg:text-base lg:px-4 lg:py-2"
             >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Previous
+              <ArrowLeft className="h-4 w-4 lg:h-5 lg:w-5 lg:mr-2" />
+              <span className="hidden lg:inline">Previous</span>
             </Button>
             <Button
               onClick={onNext}
               disabled={!canGoNext}
-              size="lg"
-              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg"
+              size="default"
+              className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50 shadow-lg lg:text-base lg:px-4 lg:py-2"
             >
-              <ArrowRight className="h-5 w-5 mr-2" />
-              Next Step
+              <ArrowRight className="h-4 w-4 lg:h-5 lg:w-5 lg:mr-2" />
+              <span className="hidden lg:inline">Next Step</span>
             </Button>
             <Button
               onClick={onReset}
               variant="outline"
-              size="lg"
-              className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800 shadow-lg"
+              size="default"
+              className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800 shadow-lg lg:text-base lg:px-4 lg:py-2"
             >
-              <RotateCcw className="h-5 w-5 mr-2" />
-              Reset
+              <RotateCcw className="h-4 w-4 lg:h-5 lg:w-5 lg:mr-2" />
+              <span className="hidden lg:inline">Reset</span>
             </Button>
           </>
         )}
@@ -105,7 +105,7 @@ export function SlideLayout({
 
       {/* Slide Title - Top center */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-        <h2 className="text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-6 py-3 rounded-lg shadow-lg border border-neutral-700">
+        <h2 className="text-lg lg:text-2xl font-bold text-neutral-100 bg-neutral-800/90 px-4 py-2 lg:px-6 lg:py-3 rounded-lg shadow-lg border border-neutral-700">
           {title}
         </h2>
       </div>
@@ -113,12 +113,12 @@ export function SlideLayout({
       {/* Closed Caption - Bottom center */}
       {!isIdle && meta && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 max-w-[900px] w-[90%]">
-          <div className="bg-black/90 text-white px-6 py-4 rounded-lg shadow-2xl border border-neutral-700">
-            <div className="flex items-start gap-4">
-              <div className="bg-neutral-700 text-neutral-100 px-3 py-1 rounded font-bold text-sm flex-shrink-0 mt-0.5">
+          <div className="bg-black/90 text-white px-4 py-3 lg:px-6 lg:py-4 rounded-lg shadow-2xl border border-neutral-700">
+            <div className="flex items-start gap-3 lg:gap-4">
+              <div className="bg-neutral-700 text-neutral-100 px-2 py-0.5 lg:px-3 lg:py-1 rounded font-bold text-xs lg:text-sm flex-shrink-0 mt-0.5">
                 {meta.number}
               </div>
-              <p className="text-base leading-relaxed">{meta.caption}</p>
+              <p className="text-sm lg:text-base leading-relaxed">{meta.caption}</p>
             </div>
           </div>
         </div>
