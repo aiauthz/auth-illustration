@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 interface SlideFrameProps {
   currentSlide: number
   totalSlides: number
+  slideTitle: string
   onSlideChange: (slide: number) => void
   children: React.ReactNode
 }
@@ -15,6 +16,7 @@ interface SlideFrameProps {
 export function SlideFrame({
   currentSlide,
   totalSlides,
+  slideTitle,
   onSlideChange,
   children,
 }: SlideFrameProps) {
@@ -54,7 +56,7 @@ export function SlideFrame({
   return (
     <div className="flex flex-col h-screen w-full bg-neutral-950 overflow-hidden">
       {/* Header with all navigation */}
-      <header className="flex items-center justify-between px-6 py-3 bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-800 flex-shrink-0 z-50">
+      <header className="relative flex items-center justify-between px-6 py-3 bg-neutral-900/95 backdrop-blur-sm border-b border-neutral-800 flex-shrink-0 z-50">
         <div className="flex items-center gap-2">
           {/* Slide number buttons */}
           {Array.from({ length: totalSlides }, (_, i) => i + 1).map((num) => (
@@ -72,7 +74,7 @@ export function SlideFrame({
               {num}
             </Button>
           ))}
-          
+
           {/* Arrow navigation */}
           <div className="flex items-center gap-2 ml-2 border-l border-neutral-700 pl-2">
             <Button
@@ -97,6 +99,11 @@ export function SlideFrame({
             </Button>
           </div>
         </div>
+
+        {/* Slide title — absolutely centered */}
+        <h2 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm lg:text-base font-semibold text-neutral-100 px-4 py-1.5 rounded-lg border border-neutral-700 bg-neutral-800/90 whitespace-nowrap">
+          {slideTitle}
+        </h2>
 
         {/* Fullscreen toggle */}
         <div className="flex items-center gap-4">

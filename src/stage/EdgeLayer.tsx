@@ -143,26 +143,70 @@ export function EdgeLayer({ edges }: EdgeLayerProps) {
           }
         }
 
-        // Manhattan path (H-V or V-H)
+        // Check if any intermediate nodes lie between from and to horizontally
+        const minX = Math.min(fromCenter.x, toCenter.x)
+        const maxX = Math.max(fromCenter.x, toCenter.x)
+        const intermediateNodes: NodeData[] = []
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+          nodesDataRef.current.forEach((nodeData, nodeId) => {
+            if (nodeId === edge.from || nodeId === edge.to) return
+            const nodeCx = nodeData.x + nodeData.w / 2
+            if (nodeCx > minX && nodeCx < maxX) {
+              intermediateNodes.push(nodeData)
+            }
+          })
+        }
+
         const midX = (start.x + end.x) / 2
         const midY = (start.y + end.y) / 2
 
         let path: string
-        if (Math.abs(dx) > Math.abs(dy)) {
-          // H-V path
+        let labelPos: Point
+
+        if (intermediateNodes.length > 0) {
+          // Route above or below intermediate nodes to avoid crossing them
+          const goingRight = dx > 0
+          const padding = 30
+
+          if (goingRight) {
+            // Left-to-right: route above
+            const topmost = Math.min(
+              fromData.y,
+              toData.y,
+              ...intermediateNodes.map((n) => n.y),
+            )
+            const bypassY = topmost - padding
+            // Exit from top of source, travel horizontally, enter from top of target
+            const startAnchor: Point = { x: fromCenter.x, y: fromData.y }
+            const endAnchor: Point = { x: toCenter.x, y: toData.y }
+            path = `M ${startAnchor.x} ${startAnchor.y} L ${startAnchor.x} ${bypassY} L ${endAnchor.x} ${bypassY} L ${endAnchor.x} ${endAnchor.y}`
+            labelPos = { x: midX, y: bypassY - 8 }
+          } else {
+            // Right-to-left: route below
+            const bottommost = Math.max(
+              fromData.y + fromData.h,
+              toData.y + toData.h,
+              ...intermediateNodes.map((n) => n.y + n.h),
+            )
+            const bypassY = bottommost + padding
+            // Exit from bottom of source, travel horizontally, enter from bottom of target
+            const startAnchor: Point = { x: fromCenter.x, y: fromData.y + fromData.h }
+            const endAnchor: Point = { x: toCenter.x, y: toData.y + toData.h }
+            path = `M ${startAnchor.x} ${startAnchor.y} L ${startAnchor.x} ${bypassY} L ${endAnchor.x} ${bypassY} L ${endAnchor.x} ${endAnchor.y}`
+            labelPos = { x: midX, y: bypassY - 8 }
+          }
+        } else if (Math.abs(dx) > Math.abs(dy)) {
+          // H-V path (no intermediate nodes)
           path = `M ${start.x} ${start.y} L ${midX} ${start.y} L ${midX} ${end.y} L ${end.x} ${end.y}`
+          labelPos = { x: midX, y: midY - 8 }
         } else {
           // V-H path
           path = `M ${start.x} ${start.y} L ${start.x} ${midY} L ${end.x} ${midY} L ${end.x} ${end.y}`
+          labelPos = { x: midX, y: midY - 8 }
         }
 
-        newPaths.set(edge.id, {
-          path,
-          labelPos: {
-            x: midX,
-            y: midY - 8,
-          },
-        })
+        newPaths.set(edge.id, { path, labelPos })
       })
 
       setPaths(newPaths)

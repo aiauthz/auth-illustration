@@ -1,3 +1,4 @@
+import { Slide0_PKCE } from '@/slides/Slide0_PKCE'
 import { Slide1_OAuthConsent } from '@/slides/Slide1_OAuthConsent'
 import { Slide2_AppToApp } from '@/slides/Slide2_AppToApp'
 import { Slide3_DelegatedApiKey } from '@/slides/Slide3_DelegatedApiKey'
@@ -13,6 +14,7 @@ export interface SlideMetadata {
 
 export const SLIDES: SlideMetadata[] = [
   {
+    component: Slide0_PKCE,
     slug: 'pkce',
     title: 'OAuth 2.0 PKCE Flow',
     description:

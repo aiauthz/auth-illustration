@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Bot, Shield, User, Server } from 'lucide-react'
+import { Bot, Globe, Shield, User, Server } from 'lucide-react'
 import { GoogleCalendarLogo } from '@/components/logos/GoogleCalendarLogo'
 import { ZoomLogo } from '@/components/logos/ZoomLogo'
 import { HoverTooltip } from '@/components/HoverTooltip'
@@ -62,6 +62,30 @@ const actorConfig: Record<
     icon: Server,
     badge: 'API',
     description: 'Third-party API service that validates API keys and provides resources.',
+  },
+  browser: {
+    title: 'Browser',
+    subtitle: 'SPA / Public Client',
+    icon: Globe,
+    badge: 'SPA',
+    description:
+      'Single-page application running in the browser. A public client that cannot securely store secrets.',
+  },
+  appServer: {
+    title: 'App Server',
+    subtitle: 'Backend',
+    icon: Server,
+    badge: 'Backend',
+    description:
+      'Backend server that securely exchanges authorization codes for tokens and stores secrets.',
+  },
+  authServer: {
+    title: 'Auth Server',
+    subtitle: 'Authorization Server',
+    icon: Shield,
+    badge: 'AuthZ',
+    description:
+      'Authorization server that authenticates users, validates PKCE challenges, and issues tokens.',
   },
 }
 
