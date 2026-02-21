@@ -1,7 +1,7 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Background -->
   <rect width="1200" height="630" fill="#171717"/>
-  
+
   <!-- Grid pattern for tech feel -->
   <defs>
     <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -9,34 +9,34 @@
     </pattern>
   </defs>
   <rect width="1200" height="630" fill="url(#grid)" opacity="0.5"/>
-  
+
   <!-- Main content container -->
   <g>
     <!-- Shield icon (larger) -->
     <path d="M200 200L120 230V300C120 365 155 425 200 440C245 425 280 365 280 300V230L200 200Z" fill="#10b981" stroke="#059669" stroke-width="3"/>
     <path d="M165 300L190 325L235 275" stroke="#171717" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-    
+
     <!-- Title -->
     <text x="350" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#f5f5f5">
-      OAuth &amp; OIDC
+      oauthflows
     </text>
-    <text x="350" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="72" font-weight="700" fill="#f5f5f5">
-      Deep Dive
+    <text x="350" y="360" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="500" fill="#a3a3a3">
+      Interactive Visualization
     </text>
-    
+
     <!-- Subtitle -->
-    <text x="350" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="32" fill="#a3a3a3">
-      Interactive Authentication Flow Visualization
+    <text x="350" y="420" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#737373">
+      OAuth 2.0 · PKCE · OIDC · AI Agent Auth · ID-JAG
     </text>
-    
+
     <!-- Feature badges -->
     <g transform="translate(350, 470)">
       <!-- Badge 1 -->
       <rect width="180" height="40" rx="20" fill="#262626"/>
       <text x="90" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#10b981" text-anchor="middle">
-        5 Interactive Flows
+        6 Interactive Flows
       </text>
-      
+
       <!-- Badge 2 -->
       <g transform="translate(200, 0)">
         <rect width="160" height="40" rx="20" fill="#262626"/>
@@ -44,37 +44,37 @@
           Step-by-Step
         </text>
       </g>
-      
+
       <!-- Badge 3 -->
       <g transform="translate(380, 0)">
-        <rect width="140" height="40" rx="20" fill="#262626"/>
-        <text x="70" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#10b981" text-anchor="middle">
-          ID-JAG Demo
+        <rect width="160" height="40" rx="20" fill="#262626"/>
+        <text x="80" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#10b981" text-anchor="middle">
+          HTTP Inspector
         </text>
       </g>
     </g>
-    
+
     <!-- Small nodes visualization (abstract representation) -->
     <g transform="translate(900, 250)">
       <!-- Connection lines -->
       <line x1="50" y1="50" x2="150" y2="50" stroke="#10b981" stroke-width="2" opacity="0.5"/>
       <line x1="150" y1="50" x2="100" y2="130" stroke="#10b981" stroke-width="2" opacity="0.5"/>
       <line x1="50" y1="50" x2="100" y2="130" stroke="#10b981" stroke-width="2" opacity="0.5"/>
-      
+
       <!-- Nodes -->
       <circle cx="50" cy="50" r="20" fill="#262626" stroke="#10b981" stroke-width="2"/>
       <circle cx="150" cy="50" r="20" fill="#262626" stroke="#10b981" stroke-width="2"/>
       <circle cx="100" cy="130" r="20" fill="#262626" stroke="#10b981" stroke-width="2"/>
-      
+
       <!-- Node labels -->
       <text x="50" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#10b981" text-anchor="middle">U</text>
       <text x="150" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#10b981" text-anchor="middle">I</text>
       <text x="100" y="136" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#10b981" text-anchor="middle">A</text>
     </g>
   </g>
-  
+
   <!-- Footer -->
   <text x="600" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#525252" text-anchor="middle">
-    github.com/iamspathan/auth-illustration
+    oauthflows.com
   </text>
 </svg>
