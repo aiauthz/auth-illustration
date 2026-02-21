@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Stage } from '@/stage/Stage'
-import { TokenChip } from '@/components/TokenChip'
 import { LoginDialog } from '@/components/LoginDialog'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
 import { SlideLayout } from '@/components/SlideLayout'
@@ -294,22 +293,6 @@ export function Slide1_OAuthConsent() {
             <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" />
           )}
 
-          {/* ID Token Display - positioned absolutely within Stage */}
-          {flowStep === 'tokens_received' && idToken && (
-            <div className="absolute right-8 bottom-8 w-[420px] bg-neutral-900/95 p-6 rounded-lg shadow-2xl border border-neutral-800 z-50 pointer-events-auto">
-              <h3 className="text-xl font-semibold text-center mb-4 text-neutral-100">Login Complete</h3>
-              <div className="flex flex-col gap-4">
-                <TokenChip
-                  label="ID Token"
-                  value={idToken}
-                  scopes={['profile.email']}
-                />
-                <div className="text-xs text-neutral-400 mt-2 text-center">
-                  Authenticated as: <span className="font-mono text-neutral-300">{username || 'user@example.com'}</span>
-                </div>
-              </div>
-            </div>
-          )}
         </Stage>
       </div>
 

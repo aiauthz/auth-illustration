@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Stage } from '@/stage/Stage'
-import { TokenChip } from '@/components/TokenChip'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
 import { SlideLayout } from '@/components/SlideLayout'
 import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { makeJwt } from '@/lib/tokens'
 import { edgeColors } from '@/lib/colors'
+import { InsightsPanel, type InsightEntry } from '@/components/InsightsPanel'
 import { Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -511,6 +511,61 @@ export function Slide5_CrossAppAccess() {
   const canGoPrevious =
     flowStep !== 'idle'
 
+  const insightEntries: InsightEntry[] = [
+    {
+      id: 'id-jag-explanation',
+      stepId: 'idp_issues_id_jag',
+      title: 'Identity Assertion JWT (ID-JAG)',
+      variant: 'positive',
+      sections: [
+        {
+          heading: 'What is it?',
+          variant: 'positive',
+          items: [
+            '• A signed JWT (typ: oauth-id-jag+jwt) issued by the IdP via Token Exchange',
+            '• Authorizes cross-app access with IdP visibility',
+          ],
+        },
+        {
+          heading: 'Key Claims',
+          variant: 'neutral',
+          items: [
+            '• aud: zoom.example.com',
+            '• client_id: ai-agent-client-id',
+            '• scope: meetings.read recordings.read',
+            '• exp: 300s (short-lived)',
+          ],
+        },
+      ],
+    },
+    {
+      id: 'problem-solved',
+      stepId: 'zoom_responds',
+      title: 'Problem Solved: IdP Maintains Full Visibility',
+      variant: 'positive',
+      description:
+        'Zoom issues the access token only after validating the ID-JAG from Okta. The IdP maintains full visibility.',
+      sections: [
+        {
+          heading: 'Benefits',
+          variant: 'positive',
+          items: [
+            '• Admin visibility into cross-app access',
+            '• Centralized authorization via IdP',
+          ],
+        },
+        {
+          heading: 'Security',
+          variant: 'positive',
+          items: [
+            '• Short-lived assertions (300s)',
+            '• No refresh tokens from resource server',
+          ],
+        },
+      ],
+    },
+  ]
+
   // Auto-validate after showing validation spinner
   useEffect(() => {
     if (flowStep === 'agent_sso' && !isValidated) {
@@ -545,119 +600,10 @@ export function Slide5_CrossAppAccess() {
             <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" position="top" />
           )}
 
-          {/* ID-JAG Explanation Box - Shows during Step 4 */}
-          {flowStep === 'idp_issues_id_jag' && (
-            <div className="absolute right-8 top-24 w-[420px] bg-green-900/95 border-2 border-green-500 p-5 rounded-lg shadow-2xl z-50 pointer-events-auto">
-              <h3 className="text-lg font-bold text-green-300 mb-3 text-center flex items-center justify-center gap-2">
-                Identity Assertion JWT (ID-JAG)
-              </h3>
-              <div className="space-y-2 text-sm text-neutral-100">
-                <div className="bg-green-950/50 p-3 rounded">
-                  <div className="font-semibold mb-1">What is ID-JAG?</div>
-                  <div className="text-xs text-neutral-300">
-                    A signed JWT (typ: <span className="font-mono text-green-300">oauth-id-jag+jwt</span>) issued by the IdP via Token Exchange. It authorizes a specific client to access a resource server on behalf of the user.
-                  </div>
-                </div>
-                <div className="bg-green-950/50 p-3 rounded">
-                  <div className="font-semibold mb-1">JWT Header</div>
-                  <div className="text-xs text-neutral-300 font-mono">
-                    {`{ "typ": "oauth-id-jag+jwt", "alg": "RS256" }`}
-                  </div>
-                </div>
-                <div className="bg-green-950/50 p-3 rounded">
-                  <div className="font-semibold mb-1">Required Claims</div>
-                  <div className="text-xs text-neutral-300 space-y-1">
-                    <div><span className="font-mono text-cyan-400">iss:</span> https://okta.example.com</div>
-                    <div><span className="font-mono text-cyan-400">sub:</span> user@example.com</div>
-                    <div><span className="font-mono text-cyan-400">aud:</span> https://zoom.example.com/ <span className="text-neutral-500">(Resource AS issuer)</span></div>
-                    <div><span className="font-mono text-cyan-400">client_id:</span> ai-agent-client-id</div>
-                    <div><span className="font-mono text-cyan-400">scope:</span> meetings.read recordings.read</div>
-                    <div><span className="font-mono text-cyan-400">jti:</span> 9e43f81b64a33f20 <span className="text-neutral-500">(unique ID)</span></div>
-                    <div><span className="font-mono text-cyan-400">exp/iat:</span> <span className="text-neutral-500">short-lived (300s)</span></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Token Display - Left side, below AI Agent actor - Compact version */}
-          {(idToken || idJag || accessToken) && (
-            <div className="absolute left-8 bottom-8 w-[320px] bg-neutral-900/95 p-3 rounded-lg shadow-2xl border border-neutral-800 z-50 pointer-events-auto">
-              <h3 className="text-base font-semibold text-center mb-2 text-neutral-100">Token Progression</h3>
-              <div className="flex flex-col gap-2">
-                {/* ID Token - Show full chip when active, checkmark when complete */}
-                {idToken && (flowStep === 'idp_returns_id_token' || flowStep === 'agent_requests_id_jag') ? (
-                  <TokenChip
-                    label="ID Token"
-                    value={idToken}
-                    scopes={['openid', 'profile']}
-                  />
-                ) : idToken && (
-                  <div className="flex items-center gap-2 text-xs text-green-400 bg-green-950/30 px-2 py-1.5 rounded border border-green-500/30">
-                    <span className="text-base">✓</span>
-                    <span className="font-semibold">ID Token received</span>
-                  </div>
-                )}
-
-                {/* ID-JAG - Show full chip when active, checkmark when complete */}
-                {idJag && (flowStep === 'idp_issues_id_jag' || flowStep === 'agent_presents_id_jag' || flowStep === 'zoom_validates_id_jag') ? (
-                  <TokenChip
-                    label="ID-JAG"
-                    value={idJag}
-                    scopes={['meetings.read', 'recordings.read']}
-                  />
-                ) : idJag && (
-                  <div className="flex items-center gap-2 text-xs text-green-400 bg-green-950/30 px-2 py-1.5 rounded border border-green-500/30">
-                    <span className="text-base">✓</span>
-                    <span className="font-semibold">ID-JAG received</span>
-                  </div>
-                )}
-
-                {/* Access Token - Show full chip when active, checkmark when used */}
-                {accessToken && flowStep === 'zoom_issues_access_token' ? (
-                  <TokenChip
-                    label="Access Token (from Zoom!)"
-                    value={accessToken}
-                    scopes={['meetings.read', 'recordings.read']}
-                  />
-                ) : accessToken && (flowStep === 'agent_calls_api' || flowStep === 'zoom_responds') && (
-                  <div className="flex items-center gap-2 text-xs text-green-400 bg-green-950/30 px-2 py-1.5 rounded border border-green-500/30">
-                    <span className="text-base">✓</span>
-                    <span className="font-semibold">Access Token received</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Solution Benefits Box - Right side at final step */}
-          {flowStep === 'zoom_responds' && (
-            <div className="absolute right-8 top-12 w-[440px] bg-green-900/20 border-2 border-green-500/50 p-6 rounded-lg shadow-2xl z-50 pointer-events-auto">
-              <h3 className="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
-                <span className="text-2xl">✓</span> Problem Solved
-              </h3>
-              <div className="bg-green-950/50 border border-green-500/30 rounded p-4 mb-4">
-                <p className="text-base text-neutral-100 font-semibold mb-2">
-                  IdP maintains complete visibility
-                </p>
-                <p className="text-sm text-neutral-300">
-                  Zoom issues the access token, but <strong>only after validating the ID-JAG from Okta</strong>. Okta maintains complete visibility and control by issuing the ID-JAG that authorizes the token.
-                </p>
-              </div>
-              <ul className="space-y-3 text-sm text-neutral-200">
-                <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold mt-0.5">•</span>
-                  <span><strong>Admin visibility:</strong> Admins can now see which apps are sharing access tokens with AI agents</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-green-400 font-bold mt-0.5">•</span>
-                  <span><strong>Centralized authorization:</strong> Okta controls access by issuing or denying ID-JAG</span>
-                </li>
-              </ul>
-            </div>
-          )}
         </Stage>
       </div>
+
+      <InsightsPanel entries={insightEntries} activeStepId={flowStep} />
 
       {httpEntries.length > 0 && (
         <button

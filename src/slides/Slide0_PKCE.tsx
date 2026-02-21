@@ -395,32 +395,6 @@ export function Slide0_PKCE() {
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
-          {/* PKCE values overlay on step 2 */}
-          {flowStep === 'generate_pkce' && (
-            <div className="absolute left-[260px] top-[420px] z-50 pointer-events-auto">
-              <div className="bg-neutral-900/95 border border-neutral-700 rounded-lg p-4 shadow-2xl max-w-[360px]">
-                <div className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-                  PKCE Generation
-                </div>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-cyan-400 text-xs font-mono">code_verifier</span>
-                    <div className="text-green-400 text-[10px] font-mono break-all mt-0.5 bg-neutral-950 rounded px-2 py-1">
-                      {codeVerifier}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-cyan-400 text-xs font-mono">code_challenge</span>
-                    <span className="text-neutral-500 text-[10px] ml-1">= SHA256(verifier)</span>
-                    <div className="text-yellow-400 text-[10px] font-mono break-all mt-0.5 bg-neutral-950 rounded px-2 py-1">
-                      {codeChallenge}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Validation indicator on step 8 */}
           {flowStep === 'auth_server_verifies' && (
             <ValidationIndicatorPositioned

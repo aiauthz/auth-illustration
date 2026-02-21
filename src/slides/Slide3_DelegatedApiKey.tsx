@@ -3,7 +3,8 @@ import { Stage } from '@/stage/Stage'
 import { SlideLayout } from '@/components/SlideLayout'
 import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { edgeColors } from '@/lib/colors'
-import { Copy, Check, Terminal, X } from 'lucide-react'
+import { InsightsPanel, type InsightEntry } from '@/components/InsightsPanel'
+import { Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type FlowStep =
@@ -46,8 +47,6 @@ const stepMetadata: Record<FlowStep, { number: number; caption: string } | null>
  */
 export function Slide3_DelegatedApiKey() {
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
-  const [apiKey] = useState('zjwt_abc123def456...')
-  const [keyCopied, setKeyCopied] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
 
   const FLOW_STEPS: FlowStep[] = [
@@ -61,7 +60,6 @@ export function Slide3_DelegatedApiKey() {
   const stepIndex = FLOW_STEPS.indexOf(flowStep)
   const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const httpEntries: HttpRequestEntry[] = useMemo(() => {
     const entries: HttpRequestEntry[] = []
 
@@ -98,6 +96,7 @@ export function Slide3_DelegatedApiKey() {
     }
 
     return entries
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowStep])
 
   const nodes = [
@@ -152,8 +151,6 @@ export function Slide3_DelegatedApiKey() {
         break
       case 'user_has_api_key':
         setFlowStep('user_shares_key')
-        setKeyCopied(true)
-        setTimeout(() => setKeyCopied(false), 2000)
         break
       case 'user_shares_key':
         setFlowStep('agent_receives_key')
@@ -178,7 +175,6 @@ export function Slide3_DelegatedApiKey() {
         setFlowStep('agent_receives_key')
         break
       case 'agent_receives_key':
-        setKeyCopied(false)
         setFlowStep('user_shares_key')
         break
       case 'user_shares_key':
@@ -192,12 +188,40 @@ export function Slide3_DelegatedApiKey() {
 
   const handleReset = () => {
     setFlowStep('idle')
-    setKeyCopied(false)
   }
 
   const canGoNext = flowStep !== 'idle' && flowStep !== 'api_response'
 
   const canGoPrevious = flowStep !== 'idle'
+
+  const insightEntries: InsightEntry[] = [
+    {
+      id: 'security-concerns',
+      stepId: 'api_response',
+      title: 'Security Concerns with Delegated API Keys',
+      variant: 'negative',
+      sections: [
+        {
+          heading: 'Key Risks',
+          variant: 'negative',
+          items: [
+            '• API key has unlimited lifetime',
+            '• Agent has access to ALL recordings',
+            '• No way to revoke agent access separately',
+          ],
+        },
+        {
+          heading: 'Visibility Gaps',
+          variant: 'negative',
+          items: [
+            "• Can't distinguish user vs agent in logs",
+            '• If agent compromised, full account at risk',
+            '• No IdP visibility or control',
+          ],
+        },
+      ],
+    },
+  ]
 
   return (
     <SlideLayout
@@ -213,105 +237,11 @@ export function Slide3_DelegatedApiKey() {
     >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
-        <Stage nodes={nodes} edges={edges} className="w-full h-full">
-          {/* API Key Display - Shows when user has key */}
-          {(flowStep === 'user_has_api_key' || flowStep === 'user_shares_key') && (
-            <div className="absolute left-8 top-[140px] w-[380px] bg-neutral-900/95 border border-orange-800/50 rounded-lg p-4 z-50 shadow-xl">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-neutral-200">User's Zoom API Key</h4>
-                {keyCopied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4 text-neutral-400" />
-                )}
-              </div>
-              <div className="font-mono text-xs bg-neutral-950 p-3 rounded border border-neutral-800 text-neutral-300 break-all">
-                {apiKey}
-              </div>
-              <div className="mt-2 text-xs text-orange-400">
-                ⚠️ Full access to all meetings & recordings
-              </div>
-            </div>
-          )}
+        <Stage nodes={nodes} edges={edges} className="w-full h-full" />
 
-          {/* Agent Stored Key - Shows when agent receives key */}
-          {(flowStep === 'agent_receives_key' || flowStep === 'agent_makes_call' || flowStep === 'api_response') && (
-            <div className="absolute left-[50%] transform -translate-x-1/2 top-[140px] w-[380px] bg-neutral-900/95 border border-red-800/50 rounded-lg p-4 z-50 shadow-xl">
-              <h4 className="text-sm font-semibold text-neutral-200 mb-2">AI Agent: Minutes Generator</h4>
-              <div className="space-y-2">
-                <div className="text-xs text-neutral-400">Purpose: Generate meeting minutes</div>
-                <div className="text-xs text-neutral-400">Zoom API Key:</div>
-                <div className="font-mono text-xs bg-neutral-950 p-3 rounded border border-neutral-800 text-neutral-300 break-all">
-                  {apiKey}
-                </div>
-                <div className="mt-2 text-xs text-red-400">
-                  🚨 No expiration • Access to ALL recordings • No audit trail
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* API Request - Shows during agent call */}
-          {flowStep === 'agent_makes_call' && (
-            <div className="absolute right-8 top-[380px] w-[380px] bg-neutral-900/95 border border-neutral-800 rounded-lg p-4 z-50 shadow-xl">
-              <div className="font-mono text-sm">
-                <div className="font-semibold mb-2 text-neutral-200">Request:</div>
-                <pre className="bg-neutral-950 p-3 rounded border border-neutral-800 text-xs text-neutral-300 overflow-auto">
-{`GET /users/me/recordings
-Authorization: Bearer ${apiKey}
-
-Agent fetching recordings
-to generate meeting minutes
-No way to distinguish from user!`}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          {/* API Response */}
-          {flowStep === 'api_response' && (
-            <div className="absolute right-8 bottom-[120px] w-[380px] bg-neutral-900/95 border border-neutral-800 rounded-lg p-4 z-50 shadow-xl">
-              <div className="font-mono text-sm">
-                <div className="font-semibold mb-2 text-neutral-200">Response:</div>
-                <pre className="bg-neutral-950 p-3 rounded border border-neutral-800 text-xs text-neutral-300 overflow-auto">
-{`HTTP/1.1 200 OK
-Content-Type: application/json
-
-{
-  "recordings": [
-    {
-      "id": "abc123",
-      "topic": "Team Standup",
-      "start_time": "2025-11-02T10:00",
-      "recording_files": [...]
-    }
-  ]
-}`}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          {/* Security Warning - Shows at final step */}
-          {flowStep === 'api_response' && (
-            <div className="absolute left-8 bottom-[120px] w-[420px] bg-red-950/90 border border-red-800 rounded-lg p-5 z-50 shadow-2xl">
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">🚨</div>
-                <div>
-                  <h4 className="font-bold text-red-200 mb-2">Security Concerns</h4>
-                  <ul className="text-sm text-red-300 space-y-1.5">
-                    <li>• API key has unlimited lifetime</li>
-                    <li>• Agent has access to ALL recordings, not just needed ones</li>
-                    <li>• No way to revoke agent access separately</li>
-                    <li>• Can't distinguish user vs agent actions in logs</li>
-                    <li>• If agent is compromised, entire account is at risk</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-        </Stage>
       </div>
+
+      <InsightsPanel entries={insightEntries} activeStepId={flowStep} />
 
       {httpEntries.length > 0 && (
         <button

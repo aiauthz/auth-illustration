@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Stage } from '@/stage/Stage'
-import { TokenChip } from '@/components/TokenChip'
 import { ConsentDialog } from '@/components/ConsentDialog'
 import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
 import { SlideLayout } from '@/components/SlideLayout'
+import { InsightsPanel, type InsightEntry } from '@/components/InsightsPanel'
 import { Terminal, X } from 'lucide-react'
-import { makeJwt } from '@/lib/tokens'
+
 import { edgeColors } from '@/lib/colors'
 import { cn } from '@/lib/utils'
 
@@ -73,11 +72,7 @@ export function Slide2_AppToApp() {
   const [showTerminal, setShowTerminal] = useState(false)
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
   const [zoomAccessToken, setZoomAccessToken] = useState<string | null>(null)
-  const [idToken, setIdToken] = useState<string | null>(null)
   const [isValidated, setIsValidated] = useState(false)
-  const [meetingResponse, setMeetingResponse] = useState<{ id: string; join_url: string } | null>(
-    null
-  )
 
   const nodes = [
     { id: 'calendar', x: 100, y: 320, w: 260 },
@@ -177,10 +172,7 @@ export function Slide2_AppToApp() {
         break
       case 'api_call':
         setFlowStep('api_response')
-        setMeetingResponse({
-          id: '987654321',
-          join_url: 'https://zoom.us/j/987654321',
-        })
+
         break
       case 'api_response':
         break
@@ -190,26 +182,19 @@ export function Slide2_AppToApp() {
   const handleAllow = () => {
     setShowConsentDialog(false)
     setFlowStep('access_token_issued')
-    setZoomAccessToken(
-      makeJwt({
-        sub: 'google-calendar-app',
-        client_id: 'zoom-client-id',
-        scope: 'meeting.read meeting.write',
-        iss: 'https://zoom.example.com',
-      })
-    )
+    setZoomAccessToken('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...')
   }
 
   const handleDeny = () => {
     setFlowStep('idle')
     setZoomAccessToken(null)
-    setMeetingResponse(null)
+
   }
 
   const handlePreviousStep = () => {
     switch (flowStep) {
       case 'api_response':
-        setMeetingResponse(null)
+    
         setFlowStep('api_call')
         break
       case 'api_call':
@@ -228,7 +213,7 @@ export function Slide2_AppToApp() {
         setFlowStep('id_token_received')
         break
       case 'id_token_received':
-        setIdToken(null)
+
         setIsValidated(true)
         setFlowStep('idp_validates')
         break
@@ -248,9 +233,8 @@ export function Slide2_AppToApp() {
   const handleReset = () => {
     setFlowStep('idle')
     setZoomAccessToken(null)
-    setIdToken(null)
     setIsValidated(false)
-    setMeetingResponse(null)
+
     setShowConsentDialog(false)
     setShowTerminal(false)
   }
@@ -260,7 +244,6 @@ export function Slide2_AppToApp() {
     { key: 'meeting.write', description: 'Schedule & update meetings' },
   ]
 
-  const activeScopes = zoomAccessToken ? ['meeting.read', 'meeting.write'] : []
   const canGoNext =
     flowStep !== 'idle' &&
     flowStep !== 'idp_validates' &&
@@ -270,18 +253,40 @@ export function Slide2_AppToApp() {
   const canGoPrevious =
     flowStep !== 'idle'
 
+  const insightEntries: InsightEntry[] = [
+    {
+      id: 'pros-cons',
+      stepId: 'api_response',
+      title: 'Standard OAuth 2.0 App-to-App',
+      variant: 'mixed',
+      sections: [
+        {
+          heading: 'Pros',
+          variant: 'positive',
+          items: [
+            '• Scoped access (meeting.read, meeting.write)',
+            '• User grants explicit consent',
+            '• Revocable tokens with expiration',
+          ],
+        },
+        {
+          heading: 'Cons',
+          variant: 'negative',
+          items: [
+            '• Each app pair requires separate OAuth setup',
+            '• IdP not involved in token issuance between apps',
+            '• No centralized visibility of cross-app access',
+          ],
+        },
+      ],
+    },
+  ]
+
   // Auto-validate after showing validation spinner
   useEffect(() => {
     if (flowStep === 'idp_validates' && !isValidated) {
       const timer = setTimeout(() => {
         setIsValidated(true)
-        const newIdToken = makeJwt({
-          sub: 'user@example.com',
-          email: 'user@example.com',
-          iss: 'https://okta.example.com',
-          aud: 'zoom-client-id',
-        })
-        setIdToken(newIdToken)
 
         setTimeout(() => {
           setFlowStep('id_token_received')
@@ -307,7 +312,6 @@ export function Slide2_AppToApp() {
   const stepIndex = FLOW_STEPS.indexOf(flowStep)
   const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const httpEntries: HttpRequestEntry[] = useMemo(() => {
     const entries: HttpRequestEntry[] = []
 
@@ -490,72 +494,10 @@ export function Slide2_AppToApp() {
             <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" position="right" />
           )}
 
-          {/* API Request - Top left, moved up to avoid overlap */}
-          {(flowStep === 'api_call' || flowStep === 'api_response') && (
-            <div className="absolute left-8 top-[120px] w-[380px] bg-neutral-900/95 border border-neutral-800 rounded-lg p-4 z-50 shadow-xl">
-              <div className="font-mono text-sm">
-                <div className="font-semibold mb-2 text-neutral-200">Request:</div>
-                <pre className="bg-neutral-950 p-3 rounded border border-neutral-800 text-xs text-neutral-300 overflow-auto">
-{`POST /meetings
-Authorization: Bearer ${zoomAccessToken?.substring(0, 20)}...
-
-{
-  "topic": "Team Sync",
-  "type": 2,
-  "start_time": "2025-11-02T10:00:00Z",
-  "duration": 30
-}`}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          {/* Token Display - Bottom Right */}
-          {(idToken || zoomAccessToken) && (
-            <div className="absolute right-8 bottom-8 w-[320px] bg-neutral-900/95 border border-neutral-800 rounded-lg p-4 z-50 shadow-xl">
-              <h4 className="text-sm font-semibold mb-3 text-neutral-200">Tokens</h4>
-              <div className="flex flex-col gap-4">
-                {idToken && (
-                  <TokenChip
-                    label="ID Token (IDP)"
-                    value={idToken}
-                    scopes={['profile', 'email']}
-                  />
-                )}
-                {zoomAccessToken && (
-                  <>
-                    <div className="flex flex-wrap gap-2">
-                      <h5 className="text-xs font-semibold text-neutral-300 w-full mb-1">Active Scopes:</h5>
-                      {activeScopes.map((scope) => (
-                        <Badge key={scope} variant="secondary" className="text-xs bg-neutral-800 border-neutral-700 text-neutral-200">
-                          {scope}
-                        </Badge>
-                      ))}
-                    </div>
-                    <TokenChip
-                      label="Access Token (Zoom)"
-                      value={zoomAccessToken}
-                      scopes={['meeting.read', 'meeting.write']}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* API Response - Below request, top left area */}
-          {meetingResponse && (
-            <div className="absolute left-8 top-[330px] w-[380px] bg-neutral-900/95 border border-neutral-800 rounded-lg p-4 z-50 shadow-xl">
-              <div className="font-mono text-sm">
-                <div className="font-semibold mb-2 text-neutral-200">Response:</div>
-                <pre className="bg-neutral-950 p-3 rounded border border-neutral-800 text-xs text-neutral-300 overflow-auto">
-                  {JSON.stringify(meetingResponse, null, 2)}
-                </pre>
-              </div>
-            </div>
-          )}
         </Stage>
       </div>
+
+      <InsightsPanel entries={insightEntries} activeStepId={flowStep} />
 
       {/* Terminal toggle button */}
       {httpEntries.length > 0 && (

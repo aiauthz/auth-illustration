@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Stage } from '@/stage/Stage'
-import { TokenChip } from '@/components/TokenChip'
 import { ConsentDialog } from '@/components/ConsentDialog'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
 import { SlideLayout } from '@/components/SlideLayout'
 import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { edgeColors } from '@/lib/colors'
+import { InsightsPanel, type InsightEntry } from '@/components/InsightsPanel'
 import { Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -84,9 +84,7 @@ const stepMetadata: Record<FlowStep, { number: number; caption: string } | null>
  */
 export function Slide4_AgentAsOAuthClient() {
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
-  const [idToken, setIdToken] = useState<string | null>(null)
-  const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [isValidated, setIsValidated] = useState(false)
+const [isValidated, setIsValidated] = useState(false)
   const [showConsentDialog, setShowConsentDialog] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
 
@@ -441,7 +439,6 @@ export function Slide4_AgentAsOAuthClient() {
       case 'idp_validates':
         break
       case 'idp_returns_id_token':
-        setIdToken('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...')
         setFlowStep('agent_requests_zoom')
         break
       case 'agent_requests_zoom':
@@ -463,7 +460,6 @@ export function Slide4_AgentAsOAuthClient() {
       case 'consent_shown':
         break
       case 'zoom_issues_access_token':
-        setAccessToken('eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzY29wZSI6InJlYWQud3JpdGUifQ...')
         setFlowStep('agent_calls_api')
         break
       case 'agent_calls_api':
@@ -480,7 +476,6 @@ export function Slide4_AgentAsOAuthClient() {
         setFlowStep('agent_calls_api')
         break
       case 'agent_calls_api':
-        setAccessToken(null)
         setFlowStep('zoom_issues_access_token')
         break
       case 'zoom_issues_access_token':
@@ -506,7 +501,6 @@ export function Slide4_AgentAsOAuthClient() {
         setFlowStep('agent_requests_zoom')
         break
       case 'agent_requests_zoom':
-        setIdToken(null)
         setFlowStep('idp_returns_id_token')
         break
       case 'idp_returns_id_token':
@@ -531,15 +525,11 @@ export function Slide4_AgentAsOAuthClient() {
   const handleDeny = () => {
     setShowConsentDialog(false)
     setFlowStep('idle')
-    setIdToken(null)
-    setAccessToken(null)
     setIsValidated(false)
   }
 
   const handleReset = () => {
     setFlowStep('idle')
-    setIdToken(null)
-    setAccessToken(null)
     setIsValidated(false)
     setShowConsentDialog(false)
   }
@@ -558,6 +548,37 @@ export function Slide4_AgentAsOAuthClient() {
 
   const canGoPrevious =
     flowStep !== 'idle'
+
+  const insightEntries: InsightEntry[] = [
+    {
+      id: 'core-problem',
+      stepId: 'zoom_responds',
+      title: 'Core Problem: IdP Has No Visibility',
+      variant: 'mixed',
+      description:
+        'Zoom issues the access token directly to the AI Agent. Okta (IdP) has no visibility into this transaction.',
+      sections: [
+        {
+          heading: 'What works',
+          variant: 'positive',
+          items: [
+            '• Agent is a registered OAuth client',
+            '• Scoped access with user consent',
+            '• Revocable tokens',
+          ],
+        },
+        {
+          heading: "What's missing",
+          variant: 'negative',
+          items: [
+            '• IdP unaware of token exchange',
+            '• No centralized admin visibility',
+            '• No IdP policy enforcement',
+          ],
+        },
+      ],
+    },
+  ]
 
   // Auto-validate after showing validation spinner
   useEffect(() => {
@@ -604,47 +625,6 @@ export function Slide4_AgentAsOAuthClient() {
             <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" position="top" />
           )}
 
-          {/* Token Display - Bottom right corner */}
-          {(idToken || accessToken) && flowStep !== 'zoom_responds' && (
-            <div className="absolute right-8 bottom-8 w-[420px] bg-neutral-900/95 p-6 rounded-lg shadow-2xl border border-neutral-800 z-50 pointer-events-auto">
-              <h3 className="text-xl font-semibold text-center mb-4 text-neutral-100">Agent Tokens</h3>
-              <div className="flex flex-col gap-4">
-                {idToken && (
-                  <TokenChip
-                    label="ID Token"
-                    value={idToken}
-                    scopes={['profile.email']}
-                  />
-                )}
-                {accessToken && (
-                  <TokenChip
-                    label="Access Token"
-                    value={accessToken}
-                    scopes={['read', 'write']}
-                  />
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Security Problem Box - Right side */}
-          {flowStep === 'zoom_responds' && (
-            <div className="absolute right-8 top-24 w-[420px] bg-red-900/20 border-2 border-red-500/50 p-6 rounded-lg shadow-2xl z-50 pointer-events-auto">
-              <h3 className="text-xl font-bold text-red-400 mb-4 flex items-center gap-2">
-                <span className="text-2xl">⚠</span> Core Security Problem
-              </h3>
-              <div className="bg-red-950/50 border border-red-500/30 rounded p-4">
-                <p className="text-base text-neutral-100 font-semibold mb-2">
-                  IdP is unaware of token exchange
-                </p>
-                <p className="text-sm text-neutral-300">
-                  When Zoom issues the access token to the AI Agent, <strong>Okta (IdP) has no visibility</strong> into this transaction.
-                  The IdP only sees that the user logged in, but doesn't know an AI Agent is receiving access tokens.
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Consent Dialog */}
           <ConsentDialog
             open={showConsentDialog}
@@ -655,8 +635,11 @@ export function Slide4_AgentAsOAuthClient() {
             onDeny={handleDeny}
             variant="app-to-app"
           />
+
         </Stage>
       </div>
+
+      <InsightsPanel entries={insightEntries} activeStepId={flowStep} />
 
       {/* Terminal toggle button */}
       {httpEntries.length > 0 && (
