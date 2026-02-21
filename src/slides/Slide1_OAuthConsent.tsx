@@ -86,6 +86,8 @@ export function Slide1_OAuthConsent() {
           redirect_uri: 'https://calendar.example.com/callback',
           scope: 'openid profile email',
           state: 'xyz123',
+          code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -118,6 +120,7 @@ export function Slide1_OAuthConsent() {
           redirect_uri: 'https://calendar.example.com/callback',
           client_id: 'google-calendar-client-id',
           client_secret: 'calendar-app-secret',
+          code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
         },
         response: {
           status: 200,
@@ -130,7 +133,7 @@ export function Slide1_OAuthConsent() {
             id_token: idToken ?? 'eyJ...',
             access_token: 'eyJhbGciOiJSUzI1...',
             token_type: 'Bearer',
-            expires_in: '3600',
+            expires_in: 3600,
           },
         },
         color: edgeColors.idToken,

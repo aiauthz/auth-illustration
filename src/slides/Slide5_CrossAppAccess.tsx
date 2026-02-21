@@ -34,23 +34,23 @@ const stepMetadata: Record<FlowStep, { number: number; caption: string } | null>
   },
   agent_requests_id_jag: {
     number: 3,
-    caption: 'Agent requests Identity Assertion JWT (ID-JAG) - AI Agent uses ID token to request an Identity Assertion Authorization Grant from Okta for Zoom access',
+    caption: 'Token Exchange: Agent requests ID-JAG - Agent sends a Token Exchange request to Okta\'s token endpoint, presenting the ID token as subject_token and specifying Zoom as the target audience',
   },
   idp_issues_id_jag: {
     number: 4,
-    caption: 'Okta issues ID-JAG to Agent - The IdP creates and signs an Identity Assertion JWT Authorization Grant specifically for Zoom API access',
+    caption: 'Okta issues ID-JAG (oauth-id-jag+jwt) - IdP validates the subject token, evaluates policy, and returns a signed Identity Assertion JWT with typ "oauth-id-jag+jwt" containing aud, client_id, scope claims',
   },
   agent_presents_id_jag: {
     number: 5,
-    caption: 'Agent presents ID-JAG to Zoom - AI Agent presents the Identity Assertion JWT to Zoom API to request an access token',
+    caption: 'JWT Bearer Grant: Agent presents ID-JAG to Zoom - Agent sends the ID-JAG as an assertion to Zoom\'s token endpoint using the jwt-bearer grant type',
   },
   zoom_validates_id_jag: {
     number: 6,
-    caption: 'Zoom validates ID-JAG with Okta - Zoom verifies the ID-JAG signature using Okta\'s published keys to ensure it was issued by the trusted IdP',
+    caption: 'Zoom validates ID-JAG - Zoom verifies the JWT typ is "oauth-id-jag+jwt", validates the signature using Okta\'s JWKS, confirms aud matches its own issuer URL, and checks client_id',
   },
   zoom_issues_access_token: {
     number: 7,
-    caption: '✓ THE SOLUTION: Zoom issues Access Token (Okta Aware) - Zoom issues access token based on validated ID-JAG. Okta maintains visibility through the ID-JAG it issued',
+    caption: 'Zoom issues Access Token (IdP-Aware) - Zoom issues access token based on validated ID-JAG. Okta maintains full visibility because it issued and scoped the ID-JAG',
   },
   agent_calls_api: {
     number: 8,
@@ -107,6 +107,9 @@ export function Slide5_CrossAppAccess() {
           client_id: 'ai-agent-client-id',
           redirect_uri: 'https://agent.example.com/callback',
           scope: 'openid profile',
+          state: 'agent_sso_state',
+          code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -137,11 +140,15 @@ export function Slide5_CrossAppAccess() {
           client_id: 'ai-agent-client-id',
           client_secret: 'ai-agent-client-secret',
           redirect_uri: 'https://agent.example.com/callback',
+          code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
         },
         response: {
           status: 200,
           statusText: 'OK',
-          headers: [{ name: 'Content-Type', value: 'application/json' }],
+          headers: [
+            { name: 'Content-Type', value: 'application/json' },
+            { name: 'Cache-Control', value: 'no-store' },
+          ],
           body: {
             id_token: idToken ?? 'eyJ...',
             token_type: 'Bearer',
@@ -153,29 +160,40 @@ export function Slide5_CrossAppAccess() {
 
     if (reached('agent_requests_id_jag')) {
       entries.push({
-        id: 'identity-assertion',
+        id: 'token-exchange',
         stepId: 'agent_requests_id_jag',
-        label: '/identity-assertion',
+        label: '/oauth/token (Token Exchange)',
         method: 'POST',
-        url: 'https://okta.example.com/oauth/identity-assertion',
+        url: 'https://okta.example.com/oauth/token',
         headers: [
           { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
-          { name: 'Authorization', value: `Bearer ${idToken ?? 'eyJ...'}` },
+          { name: 'Host', value: 'okta.example.com' },
         ],
         body: {
-          grant_type: 'urn:ietf:params:oauth:grant-type:identity-assertion',
-          target_audience: 'https://zoom.example.com',
+          grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+          requested_token_type: 'urn:ietf:params:oauth:token-type:id-jag',
+          subject_token: idToken ?? 'eyJraWQiOiJzMTZ0cVNt...',
+          subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
+          audience: 'https://zoom.example.com/',
+          resource: 'https://api.zoom.example.com/',
           scope: 'meetings.read recordings.read',
           client_id: 'ai-agent-client-id',
+          client_secret: 'ai-agent-client-secret',
         },
         response: reached('idp_issues_id_jag')
           ? {
               status: 200,
               statusText: 'OK',
-              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              headers: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Cache-Control', value: 'no-store' },
+              ],
               body: {
-                identity_assertion: idJag ?? 'eyJ...',
+                issued_token_type: 'urn:ietf:params:oauth:token-type:id-jag',
+                access_token: idJag ?? 'eyJ...',
                 token_type: 'N_A',
+                scope: 'meetings.read recordings.read',
+                expires_in: 300,
               },
             }
           : {
@@ -192,27 +210,30 @@ export function Slide5_CrossAppAccess() {
       entries.push({
         id: 'zoom-token',
         stepId: 'agent_presents_id_jag',
-        label: '/oauth/token (Zoom)',
+        label: '/oauth/token (JWT Bearer)',
         method: 'POST',
         url: 'https://zoom.example.com/oauth/token',
         headers: [
           { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
+          { name: 'Authorization', value: 'Basic YWktYWdlbnQtY2xpZW50LWlk...' },
           { name: 'Host', value: 'zoom.example.com' },
         ],
         body: {
-          grant_type: 'urn:ietf:params:oauth:grant-type:identity-assertion',
+          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
           assertion: idJag ?? 'eyJ...',
-          client_id: 'ai-agent-client-id',
-          scope: 'meetings.read recordings.read',
         },
         response: reached('zoom_issues_access_token')
           ? {
               status: 200,
               statusText: 'OK',
-              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              headers: [
+                { name: 'Content-Type', value: 'application/json' },
+                { name: 'Cache-Control', value: 'no-store' },
+              ],
               body: {
                 access_token: accessToken ?? 'eyJ...',
                 token_type: 'Bearer',
+                expires_in: 86400,
                 scope: 'meetings.read recordings.read',
               },
             }
@@ -300,7 +321,7 @@ export function Slide5_CrossAppAccess() {
       id: 'agent-to-idp-sso',
       from: 'agent',
       to: 'okta',
-      label: 'SSO (OIDC',
+      label: 'SSO (OIDC)',
       color: edgeColors.auth,
       pulse: flowStep === 'agent_sso',
       visible: flowStep === 'agent_sso',
@@ -318,7 +339,7 @@ export function Slide5_CrossAppAccess() {
       id: 'agent-to-idp-request-jag',
       from: 'agent',
       to: 'okta',
-      label: 'Request ID-JAG',
+      label: 'Token Exchange (ID-JAG)',
       color: edgeColors.consent,
       pulse: flowStep === 'agent_requests_id_jag',
       visible: flowStep === 'agent_requests_id_jag',
@@ -336,7 +357,7 @@ export function Slide5_CrossAppAccess() {
       id: 'agent-to-zoom-jag',
       from: 'agent',
       to: 'zoom',
-      label: 'Present ID-JAG',
+      label: 'JWT Bearer + ID-JAG',
       color: edgeColors.tokenAlt,
       pulse: flowStep === 'agent_presents_id_jag',
       visible: flowStep === 'agent_presents_id_jag',
@@ -345,7 +366,7 @@ export function Slide5_CrossAppAccess() {
       id: 'zoom-to-idp-validate',
       from: 'zoom',
       to: 'okta',
-      label: 'Validate ID-JAG',
+      label: 'Validate via JWKS',
       color: edgeColors.api,
       pulse: flowStep === 'zoom_validates_id_jag',
       visible: flowStep === 'zoom_validates_id_jag',
@@ -528,22 +549,31 @@ export function Slide5_CrossAppAccess() {
           {flowStep === 'idp_issues_id_jag' && (
             <div className="absolute right-8 top-24 w-[420px] bg-green-900/95 border-2 border-green-500 p-5 rounded-lg shadow-2xl z-50 pointer-events-auto">
               <h3 className="text-lg font-bold text-green-300 mb-3 text-center flex items-center justify-center gap-2">
-                <span className="text-xl">📜</span> Identity Assertion JWT (ID-JAG)
+                Identity Assertion JWT (ID-JAG)
               </h3>
               <div className="space-y-2 text-sm text-neutral-100">
                 <div className="bg-green-950/50 p-3 rounded">
                   <div className="font-semibold mb-1">What is ID-JAG?</div>
                   <div className="text-xs text-neutral-300">
-                    A signed JWT from the IdP that authorizes the agent to access a specific resource server on behalf of the user
+                    A signed JWT (typ: <span className="font-mono text-green-300">oauth-id-jag+jwt</span>) issued by the IdP via Token Exchange. It authorizes a specific client to access a resource server on behalf of the user.
                   </div>
                 </div>
                 <div className="bg-green-950/50 p-3 rounded">
-                  <div className="font-semibold mb-1">Key Claims</div>
+                  <div className="font-semibold mb-1">JWT Header</div>
+                  <div className="text-xs text-neutral-300 font-mono">
+                    {`{ "typ": "oauth-id-jag+jwt", "alg": "RS256" }`}
+                  </div>
+                </div>
+                <div className="bg-green-950/50 p-3 rounded">
+                  <div className="font-semibold mb-1">Required Claims</div>
                   <div className="text-xs text-neutral-300 space-y-1">
-                    <div><span className="font-mono">iss:</span> https://okta.example.com</div>
-                    <div><span className="font-mono">aud:</span> https://zoom.example.com</div>
-                    <div><span className="font-mono">client_id:</span> ai-agent-client-id</div>
-                    <div><span className="font-mono">scope:</span> meetings.read recordings.read</div>
+                    <div><span className="font-mono text-cyan-400">iss:</span> https://okta.example.com</div>
+                    <div><span className="font-mono text-cyan-400">sub:</span> user@example.com</div>
+                    <div><span className="font-mono text-cyan-400">aud:</span> https://zoom.example.com/ <span className="text-neutral-500">(Resource AS issuer)</span></div>
+                    <div><span className="font-mono text-cyan-400">client_id:</span> ai-agent-client-id</div>
+                    <div><span className="font-mono text-cyan-400">scope:</span> meetings.read recordings.read</div>
+                    <div><span className="font-mono text-cyan-400">jti:</span> 9e43f81b64a33f20 <span className="text-neutral-500">(unique ID)</span></div>
+                    <div><span className="font-mono text-cyan-400">exp/iat:</span> <span className="text-neutral-500">short-lived (300s)</span></div>
                   </div>
                 </div>
               </div>

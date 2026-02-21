@@ -324,6 +324,9 @@ export function Slide2_AppToApp() {
           client_id: 'zoom-client-id',
           redirect_uri: 'https://zoom.example.com/callback',
           scope: 'openid profile email',
+          state: 'zoom_state_abc',
+          code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -349,6 +352,7 @@ export function Slide2_AppToApp() {
           client_id: 'zoom-client-id',
           client_secret: 'zoom-client-secret',
           redirect_uri: 'https://zoom.example.com/callback',
+          code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
         },
         response: {
           status: 200,
@@ -380,6 +384,8 @@ export function Slide2_AppToApp() {
           redirect_uri: 'https://calendar.example.com/callback',
           scope: 'meeting.read meeting.write',
           state: 'cal_state_xyz',
+          code_challenge: 'qjrzSW9gMiUgpUvqgEPE4_-8swvyCtfOVvg55o5S_es',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -407,6 +413,7 @@ export function Slide2_AppToApp() {
           client_id: 'google-calendar-app',
           client_secret: 'calendar-app-secret',
           redirect_uri: 'https://calendar.example.com/callback',
+          code_verifier: 'M25iVXpKU3puUjFaYWg3T1NDTDQtcW1ROUY5YXlwalNoc0hhakxifmZHag',
         },
         response: {
           status: 200,

@@ -124,6 +124,9 @@ export function Slide4_AgentAsOAuthClient() {
           client_id: 'ai-agent-client-id',
           redirect_uri: 'https://agent.example.com/callback',
           scope: 'openid profile email',
+          state: 'agent_state_123',
+          code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -152,6 +155,7 @@ export function Slide4_AgentAsOAuthClient() {
           client_id: 'ai-agent-client-id',
           client_secret: 'ai-agent-client-secret',
           redirect_uri: 'https://agent.example.com/callback',
+          code_verifier: 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk',
         },
         response: {
           status: 200,
@@ -182,6 +186,9 @@ export function Slide4_AgentAsOAuthClient() {
           client_id: 'ai-agent-client-id',
           redirect_uri: 'https://agent.example.com/zoom/callback',
           scope: 'meetings.read meetings.write',
+          state: 'zoom_req_abc',
+          code_challenge: 'qjrzSW9gMiUgpUvqgEPE4_-8swvyCtfOVvg55o5S_es',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -206,6 +213,9 @@ export function Slide4_AgentAsOAuthClient() {
           client_id: 'zoom-client-id',
           redirect_uri: 'https://zoom.example.com/callback',
           scope: 'openid',
+          state: 'zoom_sso_state',
+          code_challenge: 'Xk2M0RRUT5OkH4gUit5RWnFj2Y0GfhH6VPD7bRQzzLQ',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -231,6 +241,8 @@ export function Slide4_AgentAsOAuthClient() {
           redirect_uri: 'https://agent.example.com/zoom/callback',
           scope: 'meetings.read meetings.write',
           state: 'agent_state_xyz',
+          code_challenge: 'BMu4R5KLCl7Yyuv8GlnHmfX3DR2M1pVFtAelarJHfEA',
+          code_challenge_method: 'S256',
         },
         response: {
           status: 302,
@@ -261,6 +273,7 @@ export function Slide4_AgentAsOAuthClient() {
           client_id: 'ai-agent-client-id',
           client_secret: 'ai-agent-client-secret',
           redirect_uri: 'https://agent.example.com/zoom/callback',
+          code_verifier: 'M25iVXpKU3puUjFaYWg3T1NDTDQtcW1ROUY5YXlwalNoc0hhakxifmZHag',
         },
         response: {
           status: 200,

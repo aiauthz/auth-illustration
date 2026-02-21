@@ -304,7 +304,7 @@ export function Slide0_PKCE() {
                 id_token: idToken,
                 refresh_token: 'rt_' + Math.random().toString(36).substring(2, 14),
                 token_type: 'Bearer',
-                expires_in: '3600',
+                expires_in: 3600,
                 scope: 'openid profile email',
               },
             }
