@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
 import { SlideLayout } from '@/components/SlideLayout'
+import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { makeJwt } from '@/lib/tokens'
 import { edgeColors } from '@/lib/colors'
+import { Terminal, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 type FlowStep =
   | 'idle'
@@ -59,6 +62,19 @@ const stepMetadata: Record<FlowStep, { number: number; caption: string } | null>
   },
 }
 
+const FLOW_STEPS: FlowStep[] = [
+  'idle',
+  'agent_sso',
+  'idp_returns_id_token',
+  'agent_requests_id_jag',
+  'idp_issues_id_jag',
+  'agent_presents_id_jag',
+  'zoom_validates_id_jag',
+  'zoom_issues_access_token',
+  'agent_calls_api',
+  'zoom_responds',
+]
+
 /**
  * Slide 5: Cross-App Access with Identity Assertion Authorization Grant (THE SOLUTION)
  * Shows how AI Agent uses ID-JAG to request access token directly from IdP
@@ -70,6 +86,185 @@ export function Slide5_CrossAppAccess() {
   const [idJag, setIdJag] = useState<string | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [isValidated, setIsValidated] = useState(false)
+  const [showTerminal, setShowTerminal] = useState(false)
+
+  const stepIndex = FLOW_STEPS.indexOf(flowStep)
+  const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
+
+  const httpEntries: HttpRequestEntry[] = useMemo(() => {
+    const entries: HttpRequestEntry[] = []
+
+    if (reached('agent_sso')) {
+      entries.push({
+        id: 'authorize',
+        stepId: 'agent_sso',
+        label: '/authorize',
+        method: 'GET',
+        url: 'https://okta.example.com/authorize',
+        headers: [{ name: 'Host', value: 'okta.example.com' }],
+        queryParams: {
+          response_type: 'code',
+          client_id: 'ai-agent-client-id',
+          redirect_uri: 'https://agent.example.com/callback',
+          scope: 'openid profile',
+        },
+        response: {
+          status: 302,
+          statusText: 'Found',
+          headers: [
+            { name: 'Location', value: 'https://okta.example.com/login?...' },
+          ],
+          body: null,
+        },
+        color: edgeColors.auth,
+      })
+    }
+
+    if (reached('idp_returns_id_token')) {
+      entries.push({
+        id: 'token',
+        stepId: 'idp_returns_id_token',
+        label: '/oauth/token',
+        method: 'POST',
+        url: 'https://okta.example.com/oauth/token',
+        headers: [
+          { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
+          { name: 'Host', value: 'okta.example.com' },
+        ],
+        body: {
+          grant_type: 'authorization_code',
+          code: 'auth_code_xyz',
+          client_id: 'ai-agent-client-id',
+          client_secret: 'ai-agent-client-secret',
+          redirect_uri: 'https://agent.example.com/callback',
+        },
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: [{ name: 'Content-Type', value: 'application/json' }],
+          body: {
+            id_token: idToken ?? 'eyJ...',
+            token_type: 'Bearer',
+          },
+        },
+        color: edgeColors.token,
+      })
+    }
+
+    if (reached('agent_requests_id_jag')) {
+      entries.push({
+        id: 'identity-assertion',
+        stepId: 'agent_requests_id_jag',
+        label: '/identity-assertion',
+        method: 'POST',
+        url: 'https://okta.example.com/oauth/identity-assertion',
+        headers: [
+          { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
+          { name: 'Authorization', value: `Bearer ${idToken ?? 'eyJ...'}` },
+        ],
+        body: {
+          grant_type: 'urn:ietf:params:oauth:grant-type:identity-assertion',
+          target_audience: 'https://zoom.example.com',
+          scope: 'meetings.read recordings.read',
+          client_id: 'ai-agent-client-id',
+        },
+        response: reached('idp_issues_id_jag')
+          ? {
+              status: 200,
+              statusText: 'OK',
+              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              body: {
+                identity_assertion: idJag ?? 'eyJ...',
+                token_type: 'N_A',
+              },
+            }
+          : {
+              status: 0,
+              statusText: 'Pending...',
+              headers: [],
+              body: null,
+            },
+        color: edgeColors.consent,
+      })
+    }
+
+    if (reached('agent_presents_id_jag')) {
+      entries.push({
+        id: 'zoom-token',
+        stepId: 'agent_presents_id_jag',
+        label: '/oauth/token (Zoom)',
+        method: 'POST',
+        url: 'https://zoom.example.com/oauth/token',
+        headers: [
+          { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
+          { name: 'Host', value: 'zoom.example.com' },
+        ],
+        body: {
+          grant_type: 'urn:ietf:params:oauth:grant-type:identity-assertion',
+          assertion: idJag ?? 'eyJ...',
+          client_id: 'ai-agent-client-id',
+          scope: 'meetings.read recordings.read',
+        },
+        response: reached('zoom_issues_access_token')
+          ? {
+              status: 200,
+              statusText: 'OK',
+              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              body: {
+                access_token: accessToken ?? 'eyJ...',
+                token_type: 'Bearer',
+                scope: 'meetings.read recordings.read',
+              },
+            }
+          : {
+              status: 0,
+              statusText: 'Pending...',
+              headers: [],
+              body: null,
+            },
+        color: edgeColors.tokenAlt,
+      })
+    }
+
+    if (reached('agent_calls_api')) {
+      entries.push({
+        id: 'zoom-api',
+        stepId: 'agent_calls_api',
+        label: '/v2/users/me/recordings',
+        method: 'GET',
+        url: 'https://api.zoom.example.com/v2/users/me/recordings',
+        headers: [
+          { name: 'Authorization', value: `Bearer ${accessToken ?? 'eyJ...'}` },
+          { name: 'Host', value: 'api.zoom.example.com' },
+        ],
+        response: reached('zoom_responds')
+          ? {
+              status: 200,
+              statusText: 'OK',
+              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              body: {
+                recordings: [
+                  {
+                    id: 'rec456',
+                    topic: 'Team Standup',
+                    start_time: '2025-11-02T10:00:00Z',
+                  },
+                ],
+              },
+            }
+          : {
+              status: 0,
+              statusText: 'Pending...',
+              headers: [],
+              body: null,
+            },
+        color: edgeColors.apiAlt,
+      })
+    }
+
+    return entries
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowStep])
 
   // Four actors in a specific layout
   const nodes = [
@@ -432,6 +627,49 @@ export function Slide5_CrossAppAccess() {
             </div>
           )}
         </Stage>
+      </div>
+
+      {httpEntries.length > 0 && (
+        <button
+          onClick={() => setShowTerminal((v) => !v)}
+          className={cn(
+            'absolute top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium shadow-lg transition-colors',
+            showTerminal
+              ? 'bg-neutral-700 text-neutral-100 hover:bg-neutral-600'
+              : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700',
+          )}
+        >
+          <Terminal className="h-4 w-4" />
+          <span className="hidden lg:inline">HTTP Log</span>
+          <span className="bg-neutral-600 text-neutral-200 text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+            {httpEntries.length}
+          </span>
+        </button>
+      )}
+      <div
+        className={cn(
+          'absolute bottom-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out',
+          showTerminal ? 'translate-y-0' : 'translate-y-full',
+        )}
+        style={{ height: '45%' }}
+      >
+        <div className="w-full h-full bg-neutral-950 border-t border-neutral-700 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 flex-shrink-0">
+            <div className="flex items-center gap-2 text-neutral-400 text-xs font-mono">
+              <Terminal className="h-3.5 w-3.5" />
+              HTTP Request Log
+            </div>
+            <button
+              onClick={() => setShowTerminal(false)}
+              className="text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <HttpRequestPanel entries={httpEntries} activeStepId={flowStep} />
+          </div>
+        </div>
       </div>
     </SlideLayout>
   )

@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { ConsentDialog } from '@/components/ConsentDialog'
+import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
 import { SlideLayout } from '@/components/SlideLayout'
+import { Terminal, X } from 'lucide-react'
 import { makeJwt } from '@/lib/tokens'
 import { edgeColors } from '@/lib/colors'
+import { cn } from '@/lib/utils'
 
 type FlowStep =
   | 'idle'
@@ -67,6 +70,7 @@ const stepMetadata: Record<FlowStep, { number: number; caption: string } | null>
  */
 export function Slide2_AppToApp() {
   const [showConsentDialog, setShowConsentDialog] = useState(false)
+  const [showTerminal, setShowTerminal] = useState(false)
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
   const [zoomAccessToken, setZoomAccessToken] = useState<string | null>(null)
   const [idToken, setIdToken] = useState<string | null>(null)
@@ -248,6 +252,7 @@ export function Slide2_AppToApp() {
     setIsValidated(false)
     setMeetingResponse(null)
     setShowConsentDialog(false)
+    setShowTerminal(false)
   }
 
   const scopes = [
@@ -286,6 +291,176 @@ export function Slide2_AppToApp() {
       return () => clearTimeout(timer)
     }
   }, [flowStep, isValidated])
+
+  const FLOW_STEPS: FlowStep[] = [
+    'idle',
+    'calendar_to_zoom',
+    'zoom_sso_request',
+    'idp_validates',
+    'id_token_received',
+    'scope_request',
+    'consent_shown',
+    'access_token_issued',
+    'api_call',
+    'api_response',
+  ]
+  const stepIndex = FLOW_STEPS.indexOf(flowStep)
+  const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const httpEntries: HttpRequestEntry[] = useMemo(() => {
+    const entries: HttpRequestEntry[] = []
+
+    if (reached('zoom_sso_request')) {
+      entries.push({
+        id: 'sso-authorize',
+        stepId: 'zoom_sso_request',
+        label: '/authorize',
+        method: 'GET',
+        url: 'https://okta.example.com/authorize',
+        headers: [],
+        queryParams: {
+          response_type: 'code',
+          client_id: 'zoom-client-id',
+          redirect_uri: 'https://zoom.example.com/callback',
+          scope: 'openid profile email',
+        },
+        response: {
+          status: 302,
+          statusText: 'Found',
+          headers: [{ name: 'Location', value: 'https://zoom.example.com/callback?code=auth_xyz' }],
+          body: null,
+        },
+        color: edgeColors.consent,
+      })
+    }
+
+    if (reached('id_token_received')) {
+      entries.push({
+        id: 'okta-token',
+        stepId: 'id_token_received',
+        label: '/oauth/token',
+        method: 'POST',
+        url: 'https://okta.example.com/oauth/token',
+        headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }],
+        body: {
+          grant_type: 'authorization_code',
+          code: 'auth_xyz',
+          client_id: 'zoom-client-id',
+          client_secret: 'zoom-client-secret',
+          redirect_uri: 'https://zoom.example.com/callback',
+        },
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: [
+            { name: 'Content-Type', value: 'application/json' },
+            { name: 'Cache-Control', value: 'no-store' },
+          ],
+          body: {
+            id_token: 'eyJ...',
+            token_type: 'Bearer',
+          },
+        },
+        color: edgeColors.idToken,
+      })
+    }
+
+    if (reached('scope_request')) {
+      entries.push({
+        id: 'scope-request',
+        stepId: 'scope_request',
+        label: '/oauth/authorize',
+        method: 'GET',
+        url: 'https://zoom.example.com/oauth/authorize',
+        headers: [{ name: 'Host', value: 'zoom.example.com' }],
+        queryParams: {
+          response_type: 'code',
+          client_id: 'google-calendar-app',
+          redirect_uri: 'https://calendar.example.com/callback',
+          scope: 'meeting.read meeting.write',
+          state: 'cal_state_xyz',
+        },
+        response: {
+          status: 302,
+          statusText: 'Found',
+          headers: [
+            { name: 'Location', value: 'https://zoom.example.com/consent?...' },
+          ],
+          body: null,
+        },
+        color: edgeColors.token,
+      })
+    }
+
+    if (reached('access_token_issued')) {
+      entries.push({
+        id: 'zoom-access-token',
+        stepId: 'access_token_issued',
+        label: '/oauth/token',
+        method: 'POST',
+        url: 'https://zoom.example.com/oauth/token',
+        headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }],
+        body: {
+          grant_type: 'authorization_code',
+          code: 'consent_code_xyz',
+          client_id: 'google-calendar-app',
+          client_secret: 'calendar-app-secret',
+          redirect_uri: 'https://calendar.example.com/callback',
+        },
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: [{ name: 'Content-Type', value: 'application/json' }],
+          body: {
+            access_token: zoomAccessToken || 'eyJ...',
+            token_type: 'Bearer',
+            scope: 'meeting.read meeting.write',
+          },
+        },
+        color: edgeColors.success,
+      })
+    }
+
+    if (reached('api_call')) {
+      entries.push({
+        id: 'create-meeting',
+        stepId: 'api_call',
+        label: '/v2/users/me/meetings',
+        method: 'POST',
+        url: 'https://api.zoom.example.com/v2/users/me/meetings',
+        headers: [
+          {
+            name: 'Authorization',
+            value: `Bearer ${zoomAccessToken?.substring(0, 20)}...`,
+          },
+          { name: 'Content-Type', value: 'application/json' },
+        ],
+        body: {
+          topic: 'Team Sync',
+          type: '2',
+          duration: '30',
+        },
+        response: reached('api_response')
+          ? {
+              status: 200,
+              statusText: 'OK',
+              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              body: { id: '987654321', join_url: 'https://zoom.us/j/987654321' },
+            }
+          : {
+              status: 0,
+              statusText: 'Pending...',
+              headers: [],
+              body: null,
+            },
+        color: edgeColors.api,
+      })
+    }
+
+    return entries
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowStep])
 
   return (
     <SlideLayout
@@ -373,6 +548,50 @@ Authorization: Bearer ${zoomAccessToken?.substring(0, 20)}...
             </div>
           )}
         </Stage>
+      </div>
+
+      {/* Terminal toggle button */}
+      {httpEntries.length > 0 && (
+        <button
+          onClick={() => setShowTerminal((v) => !v)}
+          className={cn(
+            'absolute top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium shadow-lg transition-colors',
+            showTerminal
+              ? 'bg-neutral-700 text-neutral-100 hover:bg-neutral-600'
+              : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700',
+          )}
+        >
+          <Terminal className="h-4 w-4" />
+          <span className="hidden lg:inline">HTTP Log</span>
+          <span className="bg-neutral-600 text-neutral-200 text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+            {httpEntries.length}
+          </span>
+        </button>
+      )}
+      <div
+        className={cn(
+          'absolute bottom-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out',
+          showTerminal ? 'translate-y-0' : 'translate-y-full',
+        )}
+        style={{ height: '45%' }}
+      >
+        <div className="w-full h-full bg-neutral-950 border-t border-neutral-700 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 flex-shrink-0">
+            <div className="flex items-center gap-2 text-neutral-400 text-xs font-mono">
+              <Terminal className="h-3.5 w-3.5" />
+              HTTP Request Log
+            </div>
+            <button
+              onClick={() => setShowTerminal(false)}
+              className="text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <HttpRequestPanel entries={httpEntries} activeStepId={flowStep} />
+          </div>
+        </div>
       </div>
 
       {/* Consent Dialog */}

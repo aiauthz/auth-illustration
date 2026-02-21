@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Stage } from '@/stage/Stage'
 import { SlideLayout } from '@/components/SlideLayout'
+import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { edgeColors } from '@/lib/colors'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, Terminal, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 type FlowStep =
   | 'idle'
@@ -46,6 +48,57 @@ export function Slide3_DelegatedApiKey() {
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
   const [apiKey] = useState('zjwt_abc123def456...')
   const [keyCopied, setKeyCopied] = useState(false)
+  const [showTerminal, setShowTerminal] = useState(false)
+
+  const FLOW_STEPS: FlowStep[] = [
+    'idle',
+    'user_has_api_key',
+    'user_shares_key',
+    'agent_receives_key',
+    'agent_makes_call',
+    'api_response',
+  ]
+  const stepIndex = FLOW_STEPS.indexOf(flowStep)
+  const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const httpEntries: HttpRequestEntry[] = useMemo(() => {
+    const entries: HttpRequestEntry[] = []
+
+    if (reached('agent_makes_call')) {
+      entries.push({
+        id: 'get-recordings',
+        stepId: 'agent_makes_call',
+        label: '/users/me/recordings',
+        method: 'GET',
+        url: 'https://api.zoom.example.com/v2/users/me/recordings',
+        headers: [
+          { name: 'Authorization', value: 'Bearer zjwt_abc123def456...' },
+          { name: 'Host', value: 'api.zoom.example.com' },
+        ],
+        response: reached('api_response')
+          ? {
+              status: 200,
+              statusText: 'OK',
+              headers: [{ name: 'Content-Type', value: 'application/json' }],
+              body: {
+                recordings: [
+                  {
+                    id: 'abc123',
+                    topic: 'Team Standup',
+                    start_time: '2025-11-02T10:00:00Z',
+                    recording_files: ['recording1.mp4'],
+                  },
+                ],
+              },
+            }
+          : { status: 0, statusText: 'Pending...', headers: [], body: null },
+        color: edgeColors.token,
+      })
+    }
+
+    return entries
+  }, [flowStep])
 
   const nodes = [
     { id: 'user', x: 100, y: 280, w: 220 },
@@ -258,6 +311,49 @@ Content-Type: application/json
             </div>
           )}
         </Stage>
+      </div>
+
+      {httpEntries.length > 0 && (
+        <button
+          onClick={() => setShowTerminal((v) => !v)}
+          className={cn(
+            'absolute top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium shadow-lg transition-colors',
+            showTerminal
+              ? 'bg-neutral-700 text-neutral-100 hover:bg-neutral-600'
+              : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700',
+          )}
+        >
+          <Terminal className="h-4 w-4" />
+          <span className="hidden lg:inline">HTTP Log</span>
+          <span className="bg-neutral-600 text-neutral-200 text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+            {httpEntries.length}
+          </span>
+        </button>
+      )}
+      <div
+        className={cn(
+          'absolute bottom-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out',
+          showTerminal ? 'translate-y-0' : 'translate-y-full',
+        )}
+        style={{ height: '45%' }}
+      >
+        <div className="w-full h-full bg-neutral-950 border-t border-neutral-700 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 flex-shrink-0">
+            <div className="flex items-center gap-2 text-neutral-400 text-xs font-mono">
+              <Terminal className="h-3.5 w-3.5" />
+              HTTP Request Log
+            </div>
+            <button
+              onClick={() => setShowTerminal(false)}
+              className="text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <HttpRequestPanel entries={httpEntries} activeStepId={flowStep} />
+          </div>
+        </div>
       </div>
     </SlideLayout>
   )

@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Stage } from '@/stage/Stage'
 import { TokenChip } from '@/components/TokenChip'
 import { LoginDialog } from '@/components/LoginDialog'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
 import { SlideLayout } from '@/components/SlideLayout'
+import { HttpRequestPanel, type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { makeJwt } from '@/lib/tokens'
 import { edgeColors } from '@/lib/colors'
+import { Terminal, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 type FlowStep =
   | 'idle'
@@ -40,6 +43,15 @@ const stepMetadata: Record<FlowStep, { number: number; caption: string } | null>
   },
 }
 
+const FLOW_STEPS: FlowStep[] = [
+  'idle',
+  'user_clicks_login',
+  'auth_request',
+  'login_shown',
+  'idp_validates',
+  'tokens_received',
+]
+
 /**
  * Slide 1: Basic OIDC Authentication Flow
  * Full-screen Stage-based layout
@@ -52,6 +64,82 @@ export function Slide1_OAuthConsent() {
   const [idToken, setIdToken] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
   const [isValidated, setIsValidated] = useState(false)
+  const [showTerminal, setShowTerminal] = useState(false)
+
+  const stepIndex = FLOW_STEPS.indexOf(flowStep)
+  const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
+
+  const httpEntries: HttpRequestEntry[] = useMemo(() => {
+    const entries: HttpRequestEntry[] = []
+
+    if (reached('auth_request')) {
+      entries.push({
+        id: 'authorize',
+        stepId: 'auth_request',
+        label: 'GET /authorize (OIDC SSO redirect)',
+        method: 'GET',
+        url: 'https://okta.example.com/authorize',
+        headers: [],
+        queryParams: {
+          response_type: 'code',
+          client_id: 'google-calendar-client-id',
+          redirect_uri: 'https://calendar.example.com/callback',
+          scope: 'openid profile email',
+          state: 'xyz123',
+        },
+        response: {
+          status: 302,
+          statusText: 'Found',
+          headers: [
+            {
+              name: 'Location',
+              value: 'https://okta.example.com/login?session=abc',
+            },
+          ],
+          body: null,
+        },
+        color: edgeColors.auth,
+      })
+    }
+
+    if (reached('tokens_received')) {
+      entries.push({
+        id: 'token-exchange',
+        stepId: 'tokens_received',
+        label: 'POST /oauth/token (token exchange)',
+        method: 'POST',
+        url: 'https://okta.example.com/oauth/token',
+        headers: [
+          { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
+        ],
+        body: {
+          grant_type: 'authorization_code',
+          code: 'auth_code_xxx',
+          redirect_uri: 'https://calendar.example.com/callback',
+          client_id: 'google-calendar-client-id',
+          client_secret: 'calendar-app-secret',
+        },
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: [
+            { name: 'Content-Type', value: 'application/json' },
+            { name: 'Cache-Control', value: 'no-store' },
+          ],
+          body: {
+            id_token: idToken ?? 'eyJ...',
+            access_token: 'eyJhbGciOiJSUzI1...',
+            token_type: 'Bearer',
+            expires_in: '3600',
+          },
+        },
+        color: edgeColors.idToken,
+      })
+    }
+
+    return entries
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowStep])
 
   const nodes = [
     { id: 'user', x: 64, y: 240, w: 220 },
@@ -220,6 +308,52 @@ export function Slide1_OAuthConsent() {
             </div>
           )}
         </Stage>
+      </div>
+
+      {/* Terminal toggle button — top right */}
+      {httpEntries.length > 0 && (
+        <button
+          onClick={() => setShowTerminal((v) => !v)}
+          className={cn(
+            'absolute top-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium shadow-lg transition-colors',
+            showTerminal
+              ? 'bg-neutral-700 text-neutral-100 hover:bg-neutral-600'
+              : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700',
+          )}
+        >
+          <Terminal className="h-4 w-4" />
+          <span className="hidden lg:inline">HTTP Log</span>
+          <span className="bg-neutral-600 text-neutral-200 text-xs px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+            {httpEntries.length}
+          </span>
+        </button>
+      )}
+
+      {/* Terminal drawer — slides up from bottom */}
+      <div
+        className={cn(
+          'absolute bottom-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out',
+          showTerminal ? 'translate-y-0' : 'translate-y-full',
+        )}
+        style={{ height: '45%' }}
+      >
+        <div className="w-full h-full bg-neutral-950 border-t border-neutral-700 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-neutral-800 flex-shrink-0">
+            <div className="flex items-center gap-2 text-neutral-400 text-xs font-mono">
+              <Terminal className="h-3.5 w-3.5" />
+              HTTP Request Log
+            </div>
+            <button
+              onClick={() => setShowTerminal(false)}
+              className="text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            <HttpRequestPanel entries={httpEntries} activeStepId={flowStep} />
+          </div>
+        </div>
       </div>
 
       {/* Login Dialog */}
