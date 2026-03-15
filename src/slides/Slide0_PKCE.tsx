@@ -8,9 +8,13 @@ import { makePkceVerifier, makePkceChallenge, makeAuthCode, makeJwt } from '@/li
 import { edgeColors } from '@/lib/colors'
 import { Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import slideData from '@/data/slide0-pkce.json'
 
 type FlowStep =
   | 'idle'
+  | 'intro_title'
+  | 'intro_problem'
+  | 'intro_actors'
   | 'user_clicks_login'
   | 'generate_pkce'
   | 'redirect_to_authorize'
@@ -21,74 +25,14 @@ type FlowStep =
   | 'auth_server_verifies'
   | 'tokens_returned'
   | 'spa_complete'
+  | 'summary_security'
+  | 'summary_takeaways'
 
-const stepMetadata: Record<FlowStep, { number: number; caption: string } | null> = {
-  idle: null,
-  user_clicks_login: {
-    number: 1,
-    caption:
-      'User clicks "Login" in the SPA — the browser-based application initiates the authentication flow.',
-  },
-  generate_pkce: {
-    number: 2,
-    caption:
-      'SPA generates a random code_verifier and computes code_challenge = SHA256(code_verifier). This PKCE pair prevents authorization code interception.',
-  },
-  redirect_to_authorize: {
-    number: 3,
-    caption:
-      'SPA redirects to Auth Server /authorize endpoint with code_challenge and code_challenge_method=S256.',
-  },
-  user_authenticates: {
-    number: 4,
-    caption:
-      'Auth Server presents a login screen. The user enters their credentials to authenticate.',
-  },
-  auth_code_redirect: {
-    number: 5,
-    caption:
-      'Auth Server redirects back to the SPA with a one-time authorization code in the URL.',
-  },
-  spa_sends_to_backend: {
-    number: 6,
-    caption:
-      'SPA sends the authorization code and the original code_verifier to the App Server backend.',
-  },
-  backend_token_exchange: {
-    number: 7,
-    caption:
-      'App Server sends the code + code_verifier to the Auth Server /token endpoint to exchange for tokens.',
-  },
-  auth_server_verifies: {
-    number: 8,
-    caption:
-      'Auth Server verifies that SHA256(code_verifier) matches the original code_challenge, then issues tokens.',
-  },
-  tokens_returned: {
-    number: 9,
-    caption:
-      'Auth Server returns access_token, id_token, and refresh_token to the App Server.',
-  },
-  spa_complete: {
-    number: 10,
-    caption:
-      'App Server returns tokens to the SPA. The user is now authenticated and the flow is complete.',
-  },
-}
+import type { StepMeta } from '@/components/SlideLayout'
 
-const FLOW_STEPS: FlowStep[] = [
-  'idle',
-  'user_clicks_login',
-  'generate_pkce',
-  'redirect_to_authorize',
-  'user_authenticates',
-  'auth_code_redirect',
-  'spa_sends_to_backend',
-  'backend_token_exchange',
-  'auth_server_verifies',
-  'tokens_returned',
-  'spa_complete',
-]
+const stepMetadata = slideData.steps as Record<FlowStep, StepMeta | null>
+
+const FLOW_STEPS = slideData.flowSteps as FlowStep[]
 
 export function Slide0_PKCE() {
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
@@ -112,87 +56,16 @@ export function Slide0_PKCE() {
 
   const stepIndex = FLOW_STEPS.indexOf(flowStep)
 
-  const nodes = [
-    { id: 'user', x: 24, y: 240, w: 180 },
-    { id: 'browser', x: 280, y: 240, w: 220 },
-    { id: 'appServer', x: 590, y: 240, w: 220 },
-    { id: 'authServer', x: 920, y: 240, w: 240 },
-  ]
+  const nodes = slideData.nodes
 
   const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
 
-  const edges = [
-    // Step 1: User clicks login in the SPA
-    {
-      id: 'user-to-browser',
-      from: 'user',
-      to: 'browser',
-      label: 'Clicks "Login"',
-      color: edgeColors.authBright,
-      pulse: flowStep === 'user_clicks_login',
-      visible: flowStep === 'user_clicks_login',
-    },
-    // Step 3: Browser redirects to Auth Server /authorize
-    {
-      id: 'browser-to-authserver-authorize',
-      from: 'browser',
-      to: 'authServer',
-      label: 'GET /authorize',
-      color: edgeColors.auth,
-      pulse: flowStep === 'redirect_to_authorize',
-      visible: flowStep === 'redirect_to_authorize',
-    },
-    // Step 5: Auth Server redirects back with authorization code
-    {
-      id: 'authserver-to-browser-code',
-      from: 'authServer',
-      to: 'browser',
-      label: 'Redirect with code',
-      color: edgeColors.consent,
-      pulse: flowStep === 'auth_code_redirect',
-      visible: flowStep === 'auth_code_redirect',
-    },
-    // Step 6: Browser sends code + verifier to App Server
-    {
-      id: 'browser-to-appserver',
-      from: 'browser',
-      to: 'appServer',
-      label: 'POST /api/auth/callback',
-      color: edgeColors.api,
-      pulse: flowStep === 'spa_sends_to_backend',
-      visible: flowStep === 'spa_sends_to_backend',
-    },
-    // Step 7: App Server sends code + verifier to Auth Server
-    {
-      id: 'appserver-to-authserver-token',
-      from: 'appServer',
-      to: 'authServer',
-      label: 'POST /oauth/token',
-      color: edgeColors.token,
-      pulse: flowStep === 'backend_token_exchange',
-      visible: flowStep === 'backend_token_exchange',
-    },
-    // Step 9: Auth Server returns tokens to App Server
-    {
-      id: 'authserver-to-appserver-tokens',
-      from: 'authServer',
-      to: 'appServer',
-      label: 'Tokens',
-      color: edgeColors.success,
-      pulse: flowStep === 'tokens_returned',
-      visible: flowStep === 'tokens_returned',
-    },
-    // Step 10: App Server returns session/tokens to Browser
-    {
-      id: 'appserver-to-browser-complete',
-      from: 'appServer',
-      to: 'browser',
-      label: 'Session + Tokens',
-      color: edgeColors.successBright,
-      pulse: flowStep === 'spa_complete',
-      visible: flowStep === 'spa_complete',
-    },
-  ]
+  const edges = slideData.edges.map((e) => ({
+    ...e,
+    color: edgeColors[e.colorKey as keyof typeof edgeColors],
+    pulse: e.pulseOn === flowStep,
+    visible: e.visibleOn.includes(flowStep),
+  }))
 
   const httpEntries: HttpRequestEntry[] = useMemo(() => {
     const entries: HttpRequestEntry[] = []
@@ -365,7 +238,7 @@ export function Slide0_PKCE() {
   const canGoNext =
     flowStep !== 'idle' &&
     flowStep !== 'user_authenticates' &&
-    flowStep !== 'spa_complete'
+    flowStep !== 'summary_takeaways'
 
   const canGoPrevious = flowStep !== 'idle' && flowStep !== 'user_clicks_login'
 
@@ -381,7 +254,7 @@ export function Slide0_PKCE() {
 
   return (
     <SlideLayout
-      title="OAuth 2.0 PKCE Flow"
+      title={slideData.title}
       flowStep={flowStep}
       stepMetadata={stepMetadata}
       onStart={handleStart}
@@ -390,7 +263,7 @@ export function Slide0_PKCE() {
       onReset={handleReset}
       canGoNext={canGoNext}
       canGoPrevious={canGoPrevious}
-      startLabel="Start PKCE Flow"
+      startLabel={slideData.startLabel}
     >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
@@ -399,11 +272,11 @@ export function Slide0_PKCE() {
           {flowStep === 'auth_server_verifies' && (
             <ValidationIndicatorPositioned
               isValidated={isValidated}
-              nodeId="authServer"
-              validatingText="Verifying PKCE"
-              validatedText="PKCE Verified"
-              validatingSubtext="SHA256(code_verifier) == code_challenge?"
-              validatedSubtext="Challenge matched — issuing tokens"
+              nodeId={slideData.validation.nodeId}
+              validatingText={slideData.validation.validatingText}
+              validatedText={slideData.validation.validatedText}
+              validatingSubtext={slideData.validation.validatingSubtext}
+              validatedSubtext={slideData.validation.validatedSubtext}
             />
           )}
         </Stage>

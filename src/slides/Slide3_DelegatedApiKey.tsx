@@ -6,6 +6,7 @@ import { edgeColors } from '@/lib/colors'
 import { InsightsPanel, type InsightEntry } from '@/components/InsightsPanel'
 import { Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import slideData from '@/data/slide3-delegated-api-key.json'
 
 type FlowStep =
   | 'idle'
@@ -15,30 +16,7 @@ type FlowStep =
   | 'agent_makes_call'
   | 'api_response'
 
-// Step metadata for captions and sequence numbers
-const stepMetadata: Record<FlowStep, { number: number; caption: string } | null> = {
-  idle: null,
-  user_has_api_key: {
-    number: 1,
-    caption: 'User has Zoom API key - The user possesses a personal API key from Zoom that grants full access to their meetings and recordings',
-  },
-  user_shares_key: {
-    number: 2,
-    caption: 'User delegates API key to AI Agent - The user copies and pastes their Zoom API key into the AI Agent so it can access meeting recordings',
-  },
-  agent_receives_key: {
-    number: 3,
-    caption: 'AI Agent stores the key - The AI Agent receives and stores the Zoom API key, now having complete access to all user meetings and recordings',
-  },
-  agent_makes_call: {
-    number: 4,
-    caption: 'AI Agent accesses recordings - The agent uses the delegated API key to fetch meeting recordings from Zoom to generate meeting minutes',
-  },
-  api_response: {
-    number: 5,
-    caption: 'Zoom responds with recordings - Zoom API responds successfully because the key is valid, but cannot distinguish between user and agent actions',
-  },
-}
+const stepMetadata = slideData.steps as Record<FlowStep, { number: number; caption: string; why?: string; risk?: string } | null>
 
 /**
  * Slide 3: Delegated API Key (The Problem)
@@ -49,14 +27,7 @@ export function Slide3_DelegatedApiKey() {
   const [flowStep, setFlowStep] = useState<FlowStep>('idle')
   const [showTerminal, setShowTerminal] = useState(false)
 
-  const FLOW_STEPS: FlowStep[] = [
-    'idle',
-    'user_has_api_key',
-    'user_shares_key',
-    'agent_receives_key',
-    'agent_makes_call',
-    'api_response',
-  ]
+  const FLOW_STEPS = slideData.flowSteps as FlowStep[]
   const stepIndex = FLOW_STEPS.indexOf(flowStep)
   const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
 
@@ -99,46 +70,14 @@ export function Slide3_DelegatedApiKey() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowStep])
 
-  const nodes = [
-    { id: 'user', x: 100, y: 280, w: 220 },
-    { id: 'agent', x: 510, y: 280, w: 240 },
-    { id: 'zoom', x: 920, y: 280, w: 260 },
-  ]
+  const nodes = slideData.nodes
 
-  const edges = [
-    {
-      id: 'user-to-agent-key',
-      from: 'user',
-      to: 'agent',
-      label: 'Copy/Paste Zoom API Key',
-      color: edgeColors.consent,
-      visible: flowStep === 'user_shares_key',
-    },
-    {
-      id: 'agent-stores-key',
-      from: 'user',
-      to: 'agent',
-      label: 'Key Stored in Agent',
-      color: edgeColors.error,
-      visible: flowStep === 'agent_receives_key',
-    },
-    {
-      id: 'agent-to-zoom-call',
-      from: 'agent',
-      to: 'zoom',
-      label: 'GET /recordings (Bearer zjwt_...)',
-      color: edgeColors.token,
-      visible: flowStep === 'agent_makes_call',
-    },
-    {
-      id: 'zoom-to-agent-response',
-      from: 'zoom',
-      to: 'agent',
-      label: 'Meeting Recordings (200 OK)',
-      color: edgeColors.success,
-      visible: flowStep === 'api_response',
-    },
-  ]
+  const edges = slideData.edges.map((e) => ({
+    ...e,
+    color: edgeColors[e.colorKey as keyof typeof edgeColors],
+    pulse: 'pulseOn' in e && e.pulseOn === flowStep,
+    visible: e.visibleOn.includes(flowStep),
+  }))
 
   const handleStartFlow = () => {
     setFlowStep('user_has_api_key')
@@ -194,38 +133,11 @@ export function Slide3_DelegatedApiKey() {
 
   const canGoPrevious = flowStep !== 'idle'
 
-  const insightEntries: InsightEntry[] = [
-    {
-      id: 'security-concerns',
-      stepId: 'api_response',
-      title: 'Security Concerns with Delegated API Keys',
-      variant: 'negative',
-      sections: [
-        {
-          heading: 'Key Risks',
-          variant: 'negative',
-          items: [
-            '• API key has unlimited lifetime',
-            '• Agent has access to ALL recordings',
-            '• No way to revoke agent access separately',
-          ],
-        },
-        {
-          heading: 'Visibility Gaps',
-          variant: 'negative',
-          items: [
-            "• Can't distinguish user vs agent in logs",
-            '• If agent compromised, full account at risk',
-            '• No IdP visibility or control',
-          ],
-        },
-      ],
-    },
-  ]
+  const insightEntries = slideData.insights as InsightEntry[]
 
   return (
     <SlideLayout
-      title="Approach: Delegated API Key to AI Agent"
+      title={slideData.title}
       flowStep={flowStep}
       stepMetadata={stepMetadata}
       onStart={handleStartFlow}

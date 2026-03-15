@@ -1,0 +1,153 @@
+{
+  "title": "OAuth 2.0 PKCE Flow",
+  "startLabel": "Start PKCE Flow",
+  "steps": {
+    "idle": null,
+    "intro_title": {
+      "number": 0,
+      "caption": "Authorization Code + PKCE",
+      "type": "title",
+      "tag": "OAuth 2.0 · RFC 7636",
+      "heading": "Authorization Code\nwith PKCE",
+      "body": "Think of this as the gold standard for any app that lives in a browser, on a phone, or in a terminal. Your SPA can't keep a secret — anyone can hit view-source. PKCE adds a clever cryptographic handshake that proves your app really is the one that started the login. Let's walk through exactly how.",
+      "accent": "blue"
+    },
+    "intro_problem": {
+      "number": 0,
+      "caption": "The problem PKCE solves",
+      "type": "text",
+      "tag": "The Problem",
+      "heading": "Why can't your app just get a token directly?",
+      "body": "Here's the thing: a browser-based app has no hiding spots. Anyone can crack it open and read the source. So without a secret, how does the auth server know the app exchanging the authorization code is the same app that asked for it? Picture someone eavesdropping on your mail and cashing your checks. That's code interception. PKCE fixes this by generating a one-time cryptographic puzzle that only your app can solve — because only your app knows the answer.",
+      "accent": "amber"
+    },
+    "intro_actors": {
+      "number": 0,
+      "caption": "Meet the actors",
+      "type": "text",
+      "tag": "The Players",
+      "heading": "Four actors, one goal",
+      "body": "You've got the User — the real person sitting at their keyboard. The Browser (SPA) — your front-end app, which can't hold secrets. The App Server — your backend, where the client_secret lives safely. And the Auth Server — the trusted authority that checks identities and hands out tokens. The whole dance happens so that your Browser gets tokens from the Auth Server without anyone ever touching the user's actual password.",
+      "accent": "blue"
+    },
+    "user_clicks_login": {
+      "number": 1,
+      "caption": "Your user clicks \"Login\" in the SPA, and the whole flow kicks off from the browser.",
+      "why": "Your user wants to prove who they are. But here's the key idea: instead of your app collecting a password (which puts you on the hook for guarding it), OAuth hands that job to a dedicated auth server. Think of it like a bouncer at the door — you don't check IDs yourself, you let the bouncer handle it.",
+      "risk": "If your app handled passwords directly, you'd be storing credentials in your own database. One breach and every user's password leaks. OAuth exists precisely so your app never has to touch that radioactive material."
+    },
+    "generate_pkce": {
+      "number": 2,
+      "caption": "Your SPA generates a random code_verifier, then computes code_challenge = SHA256(code_verifier). Think of it as creating a sealed envelope that only your app can open later.",
+      "why": "Your SPA runs entirely in the browser — a \"public client\" with no safe place to hide a secret. PKCE solves that beautifully. Your app creates a random string (the code_verifier) and hashes it (the code_challenge). Later, only the app that generated the original string can prove it. Think of it this way: you're writing an answer on a slip of paper, sealing it in an envelope, and handing the sealed envelope to the teacher before the quiz even starts.",
+      "risk": "Without PKCE, anyone who intercepts the authorization code — a rogue browser extension, a malicious app registered to the same redirect URI, a network sniffer — can trade it for tokens. PKCE makes a stolen code worthless because the attacker doesn't have the code_verifier."
+    },
+    "redirect_to_authorize": {
+      "number": 3,
+      "caption": "Your SPA redirects to the Auth Server's /authorize endpoint, sending along the code_challenge and code_challenge_method=S256.",
+      "why": "Notice how the browser's address bar now shows \"auth.example.com\" — not your app's domain. That's intentional. The user sees they're on the auth server's turf, so they know it's safe to type their password. Your app never gets near the credentials.",
+      "risk": "If your app collected credentials in its own UI — like the deprecated Password Grant does — you'd be training users to type passwords into any app that asks nicely. That's exactly what phishing exploits. The redirect pattern breaks that habit."
+    },
+    "user_authenticates": {
+      "number": 4,
+      "caption": "The Auth Server shows a login screen and the user enters their credentials — on the auth server's domain, not yours.",
+      "why": "The auth server owns the login experience. That means it can enforce MFA, throw up CAPTCHAs, flag suspicious logins from new devices, and support federated identity like \"Sign in with Google\" or SAML. None of that works if your app is the one collecting the password.",
+      "risk": "Without a centralized login at the auth server, you lose MFA, device trust, anomaly detection, and single sign-on across all your apps. You're reinventing the wheel, badly."
+    },
+    "auth_code_redirect": {
+      "number": 5,
+      "caption": "The Auth Server redirects the user back to your SPA with a short-lived, single-use authorization code in the URL.",
+      "why": "Here's the clever part: the auth server hands back a code, not a token. Think of it like a coat-check ticket. The ticket is useless without the matching stub (your code_verifier or client_secret). Even if someone grabs the ticket, they can't claim the coat.",
+      "risk": "If the token came back directly in the URL — the way the deprecated Implicit flow worked — it would show up in browser history, HTTP Referer headers, and server logs. An authorization code leaking? No big deal. Without the code_verifier, nobody can do anything with it."
+    },
+    "spa_sends_to_backend": {
+      "number": 6,
+      "caption": "Your SPA passes the authorization code and the original code_verifier to your App Server backend.",
+      "why": "The real token exchange happens server-side, where your client_secret is stored safely — never exposed to the browser. The code_verifier tags along to prove that this backend request is on behalf of the same app that kicked off the flow. Two pieces of proof, one transaction.",
+      "risk": "If the token exchange happened entirely in the browser, network traffic analysis could reveal it. Your backend provides a secure, server-to-server channel that browsers simply cannot match."
+    },
+    "backend_token_exchange": {
+      "number": 7,
+      "caption": "Your App Server sends the authorization code plus the code_verifier to the Auth Server's /token endpoint.",
+      "why": "Notice what's happening here: server-to-server communication that never touches the browser. Your App Server authenticates with its client_secret and proves possession of the code_verifier. That's two independent proofs of identity in a single request. Belt and suspenders.",
+      "risk": "Without a server-side exchange, the access token would travel through the browser — exposed to XSS attacks, malicious browser extensions, and compromised CDN scripts. Keeping it server-side removes that entire attack surface."
+    },
+    "auth_server_verifies": {
+      "number": 8,
+      "caption": "The Auth Server takes the code_verifier, computes SHA256(code_verifier), and checks whether it matches the code_challenge from step 3. If it matches, tokens are issued.",
+      "why": "Here's the moment of truth — the PKCE puzzle check. Remember when your app sealed that envelope in step 2? The auth server opens it now. It hashes the code_verifier and compares the result to the code_challenge it stored earlier. A match means the requester is provably the same entity that started the flow. Cryptographic proof, not trust.",
+      "risk": "Without this check, a stolen authorization code could be exchanged by anyone. PKCE makes code theft completely pointless — the attacker would need the code_verifier, which never left your app."
+    },
+    "tokens_returned": {
+      "number": 9,
+      "caption": "The Auth Server returns three tokens to your App Server: an access_token, an id_token, and a refresh_token.",
+      "why": "Each token has a specific job. The access_token is your API key — short-lived, usually about an hour. The id_token tells your app who just logged in (email, name, profile claims). The refresh_token lets your app silently grab new access tokens without making the user log in again. Three tokens, three responsibilities, clean separation.",
+      "risk": "Short-lived access tokens mean a stolen token only works for minutes or hours, not forever. Refresh tokens mean your users don't have to re-authenticate constantly. The separation limits the blast radius: if one token leaks, the damage stays contained."
+    },
+    "spa_complete": {
+      "number": 10,
+      "caption": "Your App Server sends tokens back to the SPA. The user is authenticated, the flow is done — and your app never saw a password.",
+      "why": "Your SPA now has an access_token to call APIs and an id_token to know who the user is. Look at the entire journey: the user's password went to the auth server and nowhere else. Your app proved its identity with PKCE and a client_secret. Clean, secure, no shortcuts.",
+      "risk": "One more thing: where you store these tokens matters. localStorage is vulnerable to XSS — any script on the page can read it. The safer approach: keep tokens in memory (lost on page refresh, which is fine) or use httpOnly cookies with a backend-for-frontend pattern so JavaScript can't touch them."
+    },
+    "summary_security": {
+      "number": 11,
+      "caption": "What PKCE protects you from",
+      "type": "summary",
+      "tag": "Security",
+      "heading": "What PKCE protects you from",
+      "accent": "red",
+      "bullets": [
+        "Code interception goes nowhere. A malicious app or browser extension that grabs the authorization code can't exchange it without the code_verifier — the puzzle piece that never left your app.",
+        "Man-in-the-middle attacks fall flat. Even if an attacker watches the code fly over the network, they can't use it. The code_verifier stays safely inside your client the entire time.",
+        "Replay attacks don't work. Every code_verifier is random and single-use. Trying to replay an old authorization request fails because the challenge simply won't match.",
+        "Token leakage via URL is gone. Unlike the Implicit flow, the access token never appears in any URL. It comes back in the HTTP response body of the token exchange — invisible to browser history, Referer headers, and server logs."
+      ]
+    },
+    "summary_takeaways": {
+      "number": 12,
+      "caption": "What you should take away from this",
+      "type": "summary",
+      "tag": "Takeaways",
+      "heading": "What you just learned",
+      "accent": "green",
+      "bullets": [
+        "OAuth delegates authentication so your app never sees the user's password. Full stop.",
+        "PKCE creates a cryptographic binding between the authorization request and the token exchange, proving they came from the same client. No shared secret required.",
+        "The authorization code is like a coat-check ticket — completely useless without the matching code_verifier or client_secret.",
+        "Access tokens live for minutes or hours. Refresh tokens live for days or months. That separation means a single leaked token can only do limited damage.",
+        "For SPAs and mobile apps, always use Authorization Code + PKCE. The Implicit flow had its day, and that day is over."
+      ]
+    }
+  },
+  "flowSteps": [
+    "idle", "intro_title", "intro_problem", "intro_actors",
+    "user_clicks_login", "generate_pkce", "redirect_to_authorize",
+    "user_authenticates", "auth_code_redirect", "spa_sends_to_backend",
+    "backend_token_exchange", "auth_server_verifies", "tokens_returned",
+    "spa_complete", "summary_security", "summary_takeaways"
+  ],
+  "nodes": [
+    { "id": "user", "x": 24, "y": 240, "w": 180 },
+    { "id": "browser", "x": 280, "y": 240, "w": 220 },
+    { "id": "appServer", "x": 590, "y": 240, "w": 220 },
+    { "id": "authServer", "x": 920, "y": 240, "w": 240 }
+  ],
+  "edges": [
+    { "id": "user-to-browser", "from": "user", "to": "browser", "label": "Clicks \"Login\"", "colorKey": "authBright", "pulseOn": "user_clicks_login", "visibleOn": ["user_clicks_login"] },
+    { "id": "browser-to-authserver-authorize", "from": "browser", "to": "authServer", "label": "GET /authorize", "colorKey": "auth", "pulseOn": "redirect_to_authorize", "visibleOn": ["redirect_to_authorize"] },
+    { "id": "authserver-to-browser-code", "from": "authServer", "to": "browser", "label": "Redirect with code", "colorKey": "consent", "pulseOn": "auth_code_redirect", "visibleOn": ["auth_code_redirect"] },
+    { "id": "browser-to-appserver", "from": "browser", "to": "appServer", "label": "POST /api/auth/callback", "colorKey": "api", "pulseOn": "spa_sends_to_backend", "visibleOn": ["spa_sends_to_backend"] },
+    { "id": "appserver-to-authserver-token", "from": "appServer", "to": "authServer", "label": "POST /oauth/token", "colorKey": "token", "pulseOn": "backend_token_exchange", "visibleOn": ["backend_token_exchange"] },
+    { "id": "authserver-to-appserver-tokens", "from": "authServer", "to": "appServer", "label": "Tokens", "colorKey": "success", "pulseOn": "tokens_returned", "visibleOn": ["tokens_returned"] },
+    { "id": "appserver-to-browser-complete", "from": "appServer", "to": "browser", "label": "Session + Tokens", "colorKey": "successBright", "pulseOn": "spa_complete", "visibleOn": ["spa_complete"] }
+  ],
+  "validation": {
+    "step": "auth_server_verifies",
+    "nodeId": "authServer",
+    "validatingText": "Verifying PKCE",
+    "validatedText": "PKCE Verified",
+    "validatingSubtext": "SHA256(code_verifier) == code_challenge?",
+    "validatedSubtext": "Challenge matched — issuing tokens"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "title": "Basic OIDC Authentication Flow",
+  "startLabel": "Start OAuth Flow",
+  "steps": {
+    "idle": null,
+    "user_clicks_login": {
+      "number": 1,
+      "caption": "User clicks \"Sign in\" - Your user wants into Google Calendar, so they hit that login button. That single click kicks off the whole authentication dance.",
+      "why": "Here's the thing: your user never hands their password to Calendar directly. Instead, the app punts authentication over to a trusted Identity Provider. Think of it like a bouncer checking IDs at the door so the bar never has to handle fake IDs themselves.",
+      "risk": "If Calendar collected passwords on its own, one server breach would spill every user's credentials. Even worse, phishing clones could mimic that login page and harvest passwords without anyone noticing the difference."
+    },
+    "auth_request": {
+      "number": 2,
+      "caption": "Calendar app initiates SSO - Calendar redirects the browser over to your IdP, carrying along a client_id, redirect_uri, and a state parameter for the ride.",
+      "why": "That redirect packs a state parameter and a PKCE challenge, which the IdP will use later to prove the response wasn't tampered with. SSO means your user logs in once and gets access everywhere in the org. No more password fatigue.",
+      "risk": "Without that state parameter, an attacker could pull off a CSRF attack by tricking your user into finishing an OAuth flow that secretly binds the attacker's account. Without PKCE, anyone who intercepts the authorization code could exchange it for tokens."
+    },
+    "login_shown": {
+      "number": 3,
+      "caption": "IdP presents login screen - Now the user sees the familiar Identity Provider login page and enters their credentials. Notice how they're authenticating with the IdP, not with Calendar.",
+      "why": "By centralizing the login at the IdP, you get consistent security policies everywhere: MFA, password complexity rules, lockout thresholds. Your users build muscle memory for one trusted login page instead of juggling dozens of different ones.",
+      "risk": "Imagine if every app ran its own login screen. You'd have no single place to enforce MFA or block brute-force attempts. Revoking access across the org would be a nightmare, and compromised apps could silently capture credentials."
+    },
+    "idp_validates": {
+      "number": 4,
+      "caption": "IDP validates user identity - The IdP checks those credentials and confirms the user is who they claim to be. Think of it this way: the IdP is the single source of truth for identity.",
+      "why": "The IdP doesn't just check a password. It enforces MFA, evaluates device trust, and runs conditional access policies before vouching for anyone. Only after all those checks pass does the IdP give the thumbs-up to the requesting app.",
+      "risk": "Without centralized validation, every app builds its own credential store and its own security checks. A weakness in any single app's login logic could hand attackers the keys to accounts across your whole organization."
+    },
+    "tokens_received": {
+      "number": 5,
+      "caption": "Authentication complete - Calendar gets back an ID token packed with the user's identity info. Now your app knows exactly who this person is, without ever touching their password.",
+      "why": "The ID token is a signed JWT that cryptographically proves the user's identity. Calendar checks the signature against the IdP's public keys, and that's it. Trust established, password never exposed. Clean and secure.",
+      "risk": "If your app accepted identity claims without verifying a cryptographic signature, anyone could forge a token and impersonate any user. And without an audience (aud) claim, a token minted for one app could be replayed against a completely different one."
+    }
+  },
+  "flowSteps": [
+    "idle", "user_clicks_login", "auth_request", "login_shown", "idp_validates", "tokens_received"
+  ],
+  "nodes": [
+    { "id": "user", "x": 64, "y": 240, "w": 220 },
+    { "id": "calendar", "x": 480, "y": 240, "w": 260 },
+    { "id": "idp", "x": 1000, "y": 240, "w": 240 }
+  ],
+  "edges": [
+    { "id": "user-to-calendar", "from": "user", "to": "calendar", "label": "Clicks \"Sign in\"", "colorKey": "authBright", "pulseOn": "user_clicks_login", "visibleOn": ["user_clicks_login"] },
+    { "id": "calendar-to-idp", "from": "calendar", "to": "idp", "label": "SSO (OIDC)", "colorKey": "auth", "pulseOn": "auth_request", "visibleOn": ["auth_request"] },
+    { "id": "idp-to-calendar-token", "from": "idp", "to": "calendar", "label": "ID Token", "colorKey": "idToken", "pulseOn": "tokens_received", "visibleOn": ["tokens_received"] }
+  ]
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
 
 interface AnimatedTokenProps {
   startX: number
@@ -12,7 +12,8 @@ interface AnimatedTokenProps {
 }
 
 /**
- * AnimatedToken - A token that animates along a path
+ * AnimatedToken - A glowing token that animates from one position to another.
+ * Uses motion for spring-based animation with proper exit handling.
  */
 export function AnimatedToken({
   startX,
@@ -20,68 +21,53 @@ export function AnimatedToken({
   endX,
   endY,
   color,
-  duration = 1500,
+  duration = 1.5,
   label = '🔑',
   onComplete,
 }: AnimatedTokenProps) {
-  const [progress, setProgress] = useState(0)
-
-  useEffect(() => {
-    const startTime = Date.now()
-    
-    const animate = () => {
-      const elapsed = Date.now() - startTime
-      const newProgress = Math.min(elapsed / duration, 1)
-      
-      setProgress(newProgress)
-      
-      if (newProgress < 1) {
-        requestAnimationFrame(animate)
-      } else if (onComplete) {
-        onComplete()
-      }
-    }
-    
-    requestAnimationFrame(animate)
-  }, [duration, onComplete])
-
-  // Easing function for smooth animation
-  const easeInOutCubic = (t: number): number => {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-  }
-
-  const easedProgress = easeInOutCubic(progress)
-  const currentX = startX + (endX - startX) * easedProgress
-  const currentY = startY + (endY - startY) * easedProgress
-
   return (
-    <div
-      className="absolute pointer-events-none z-50 transition-opacity"
-      style={{
-        left: `${currentX}px`,
-        top: `${currentY}px`,
-        transform: 'translate(-50%, -50%)',
-        opacity: progress < 0.95 ? 1 : 1 - (progress - 0.95) * 20,
+    <motion.div
+      className="absolute pointer-events-none z-50"
+      style={{ transform: 'translate(-50%, -50%)' }}
+      initial={{ left: startX, top: startY, opacity: 0, scale: 0.3 }}
+      animate={{ left: endX, top: endY, opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.3 }}
+      transition={{
+        left: { duration, ease: [0.4, 0, 0.2, 1] },
+        top: { duration, ease: [0.4, 0, 0.2, 1] },
+        opacity: { duration: 0.3, delay: 0 },
+        scale: { duration: 0.4, ease: 'easeOut' },
       }}
+      onAnimationComplete={() => onComplete?.()}
     >
-      <div
-        className="relative flex items-center justify-center w-12 h-12 rounded-full shadow-2xl animate-pulse"
+      {/* Outer glow ring */}
+      <motion.div
+        className="absolute inset-0 rounded-full blur-xl"
+        style={{ backgroundColor: color, opacity: 0.4 }}
+        animate={{ scale: [1.2, 1.8, 1.2] }}
+        transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      {/* Token body */}
+      <motion.div
+        className="relative flex items-center justify-center w-12 h-12 rounded-full shadow-2xl"
         style={{
           backgroundColor: color,
           boxShadow: `0 0 20px ${color}, 0 0 40px ${color}80`,
         }}
+        animate={{ scale: [1, 1.1, 1] }}
+        transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
       >
         <span className="text-2xl">{label}</span>
-      </div>
-      {/* Trail effect */}
-      <div
-        className="absolute inset-0 rounded-full blur-md"
-        style={{
-          backgroundColor: color,
-          opacity: 0.3,
-          transform: 'scale(1.5)',
-        }}
+      </motion.div>
+
+      {/* Trail particles */}
+      <motion.div
+        className="absolute inset-0 rounded-full"
+        style={{ backgroundColor: color }}
+        animate={{ scale: [1, 2.5], opacity: [0.5, 0] }}
+        transition={{ duration: 0.8, repeat: Infinity, ease: 'easeOut' }}
       />
-    </div>
+    </motion.div>
   )
 }

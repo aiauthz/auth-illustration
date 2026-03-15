@@ -1,0 +1,78 @@
+{
+  "title": "Approach: Delegated API Key to AI Agent",
+  "steps": {
+    "idle": null,
+    "user_has_api_key": {
+      "number": 1,
+      "caption": "User has Zoom API key - Your user has a personal API key from Zoom. Think of it like a master key that opens every door in the house: full access to meetings, recordings, everything.",
+      "why": "API keys are the simplest credential model out there. Zoom issues a static secret tied to the user's account, and whoever holds that key gets unrestricted access to all of that account's resources. Simple, but dangerously powerful.",
+      "risk": "The key never expires and has no scope limits. If it leaks through a log file, a misconfigured config, or a compromised agent, the attacker gets the exact same unlimited access your user has."
+    },
+    "user_shares_key": {
+      "number": 2,
+      "caption": "User delegates API key to AI Agent - The user copies their Zoom API key and pastes it into the AI Agent. Old-school credential sharing at its finest.",
+      "why": "Without an OAuth integration, copy-paste is literally the only way to give the agent access. And because API keys can't be scoped down, the user is forced to share a full-privilege credential. All or nothing.",
+      "risk": "Now that credential lives in two places: the user's own storage and the agent's storage. Each copy is a separate attack surface, and neither Zoom nor your IdP has any idea the key was shared."
+    },
+    "agent_receives_key": {
+      "number": 3,
+      "caption": "AI Agent stores the key - The agent saves that Zoom API key so it can make calls on its own schedule. No token refresh flow, no expiry. Just a static secret sitting in storage.",
+      "why": "The agent needs to persist the key because it makes API calls on its own timeline, like polling for new recordings. Since there's no refresh token mechanism, that static key is the only credential it has.",
+      "risk": "Your agent now holds an indefinite, unscoped credential. If the agent gets compromised, the attacker can silently access every meeting, recording, and contact in the user's Zoom account. No time limit, no restrictions."
+    },
+    "agent_makes_call": {
+      "number": 4,
+      "caption": "AI Agent accesses recordings - The agent uses that API key to fetch meeting recordings from Zoom. To Zoom, the agent looks identical to the human user.",
+      "why": "The agent authenticates to Zoom using the same bearer token the user would use. Here's the thing: Zoom's API has no way to tell that the caller is an AI agent rather than the actual human. They look the same.",
+      "risk": "Zoom's audit logs attribute every action to the user, not the agent. If the agent misbehaves, over-fetches data, or accesses the wrong recordings, that activity is invisible to IT admins and completely off the IdP's radar."
+    },
+    "api_response": {
+      "number": 5,
+      "caption": "Zoom responds with recordings - Zoom sees a valid key and sends back the data. It has no clue whether a human or an AI made the request.",
+      "why": "Zoom validates the bearer token and returns all matching recordings. From Zoom's perspective, a valid key is a valid key. It has zero awareness that a third-party agent made the request instead of the user's own client.",
+      "risk": "No IdP is in the loop here, so your enterprise has zero centralized visibility. The admin can't enforce policies like \"agents may only read recordings\" or revoke agent access without pulling the rug on the user's own key."
+    }
+  },
+  "flowSteps": [
+    "idle", "user_has_api_key", "user_shares_key", "agent_receives_key", "agent_makes_call", "api_response"
+  ],
+  "nodes": [
+    { "id": "user", "x": 100, "y": 280, "w": 220 },
+    { "id": "agent", "x": 510, "y": 280, "w": 240 },
+    { "id": "zoom", "x": 920, "y": 280, "w": 260 }
+  ],
+  "edges": [
+    { "id": "user-to-agent-key", "from": "user", "to": "agent", "label": "Copy/Paste Zoom API Key", "colorKey": "consent", "visibleOn": ["user_shares_key"] },
+    { "id": "agent-stores-key", "from": "user", "to": "agent", "label": "Key Stored in Agent", "colorKey": "error", "visibleOn": ["agent_receives_key"] },
+    { "id": "agent-to-zoom-call", "from": "agent", "to": "zoom", "label": "GET /recordings (Bearer zjwt_...)", "colorKey": "token", "visibleOn": ["agent_makes_call"] },
+    { "id": "zoom-to-agent-response", "from": "zoom", "to": "agent", "label": "Meeting Recordings (200 OK)", "colorKey": "success", "visibleOn": ["api_response"] }
+  ],
+  "insights": [
+    {
+      "id": "security-concerns",
+      "stepId": "api_response",
+      "title": "Why Delegated API Keys Are Dangerous",
+      "variant": "negative",
+      "sections": [
+        {
+          "heading": "The Big Risks",
+          "variant": "negative",
+          "items": [
+            "That API key never expires, so a leak means permanent access until someone manually rotates it",
+            "Your agent has access to ALL recordings, not just the ones it actually needs",
+            "You can't revoke the agent's access without killing the user's own key too"
+          ]
+        },
+        {
+          "heading": "The Blind Spots",
+          "variant": "negative",
+          "items": [
+            "Zoom's logs can't tell you whether the user or the agent made a given request",
+            "If the agent gets compromised, the attacker has full account access with no expiry",
+            "Your IdP has absolutely no visibility into or control over any of this"
+          ]
+        }
+      ]
+    }
+  ]
+}

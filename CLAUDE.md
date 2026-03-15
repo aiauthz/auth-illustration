@@ -4,7 +4,7 @@
 
 Interactive visualization app for OAuth 2.0, OpenID Connect (OIDC), and Identity Assertion Authorization Grant (ID-JAG) flows. An educational presentation tool demonstrating secure authentication patterns, including how AI agents authenticate with identity providers.
 
-5 slides cover: OAuth Consent, App-to-App Integration, Delegated API Key, Agent as OAuth Client, and Cross-App Access (ID-JAG).
+11 slides cover: PKCE, OIDC Consent, App-to-App Integration, Delegated API Key, Agent as OAuth Client, Cross-App Access (ID-JAG), Client Credentials (M2M), Refresh Token, Device Code, Implicit (deprecated), and ROPC (deprecated). Plus an interactive OAuth Playground at /playground.
 
 ## Tech Stack
 
@@ -77,6 +77,10 @@ src/
 - **Animation:** requestAnimationFrame + CSS transitions + SVG dash-offset animations. Easing via cubic functions.
 - **Navigation:** Global keydown listener in App.tsx. Space/Arrow/PageDown/n = next step, Arrow Left/PageUp/p = prev, number keys 1-5 = jump to slide, F = fullscreen.
 - **Custom events:** `slideNextStep` dispatched for slide-level step progression (handled inside SlideLayout).
+
+## Code Quality
+
+- **Code will be reviewed by Codex.** Write clean, readable, production-quality code. Prioritize clarity, correctness, and maintainability. Avoid shortcuts, magic numbers, and unclear abstractions.
 
 ## Key Patterns
 

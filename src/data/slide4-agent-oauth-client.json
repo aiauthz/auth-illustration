@@ -1,0 +1,135 @@
+{
+  "title": "Approach: AI Agent as a Registered OAuth Client",
+  "steps": {
+    "idle": null,
+    "user_sso": {
+      "number": 1,
+      "caption": "AI Agent initiates SSO - The agent kicks off SSO by redirecting to the IdP on behalf of the user. Before anything else happens, we need to know who this person is.",
+      "why": "Starting with SSO ensures a trusted Identity Provider verifies the user's identity before any resource access occurs. The agent can't fabricate identity claims on its own, which is exactly how you want it.",
+      "risk": "Without SSO, the agent would need to collect and store user passwords directly. That creates a credential-stuffing target and bypasses every IdP-enforced policy, from MFA to conditional access."
+    },
+    "idp_validates": {
+      "number": 2,
+      "caption": "IDP validates user identity - The IdP runs the user through its full authentication stack: credentials, MFA, device trust, risk scoring. The whole nine yards.",
+      "why": "The IdP applies its complete authentication policy before issuing any token. Think of it this way: the IdP is the single enforcement point for authentication strength across your entire enterprise.",
+      "risk": "If authentication were skipped or weakened, a stolen session cookie or phished credential could be used to authorize agent access the user never intended. You'd have shadow delegations with no audit trail."
+    },
+    "idp_returns_id_token": {
+      "number": 3,
+      "caption": "IdP issues ID Token to Agent - The IdP sends back an ID token to the agent. That token is cryptographic proof of who the user is, without exposing their password or session.",
+      "why": "The ID token tells the agent who the user is (sub, email) without ever exposing sensitive credentials. The agent can present this downstream to prove it's acting on behalf of a verified human.",
+      "risk": "If the IdP issued a long-lived or overly broad token here, a compromised agent could replay it to impersonate the user across many services. Short expiry and narrow audience claims keep the blast radius small."
+    },
+    "agent_requests_zoom": {
+      "number": 4,
+      "caption": "Agent requests Zoom resources - Armed with the ID token, the agent now asks Zoom for access to the user's meeting recordings through a standard OAuth authorization code flow.",
+      "why": "The agent initiates a proper OAuth authorization code flow with Zoom. No shortcuts. No credential sharing. Just the standard, well-tested way for a third-party app to request delegated access to a resource server.",
+      "risk": "If the agent tried to use the ID token directly as an access credential for Zoom, it would violate the token's intended audience and skip Zoom's own authorization checks entirely. That's a protocol violation with real security consequences."
+    },
+    "zoom_redirects_to_idp": {
+      "number": 5,
+      "caption": "Zoom redirects to IDP - Zoom doesn't manage passwords, so it bounces the request over to the IdP to confirm identity via OIDC.",
+      "why": "Zoom delegates authentication to your enterprise IdP. That redirect is Zoom's way of saying \"I need to verify who this person is before I hand out any authorization.\" Smart separation of concerns.",
+      "risk": "Without this redirect, Zoom would have to take the agent's word about user identity. A malicious agent could fabricate user context and gain unauthorized access."
+    },
+    "idp_validates_identity": {
+      "number": 6,
+      "caption": "IDP validates identity - The IdP verifies the user's identity a second time, confirming that the same human who authenticated with the agent is the one authorizing Zoom access.",
+      "why": "This second validation is crucial. It ensures the same user who authenticated with the agent is also the user authorizing Zoom access. No token substitution between different user sessions.",
+      "risk": "If the IdP didn't re-verify, a compromised agent could swap in a different user's context to access someone else's Zoom recordings. That's a privilege escalation from one user's data to another's."
+    },
+    "idp_returns_id_token_to_zoom": {
+      "number": 7,
+      "caption": "IdP returns ID Token to Zoom - The IdP sends Zoom an ID token confirming the user's identity. Now Zoom can tie the upcoming consent grant to a verified person.",
+      "why": "The ID token to Zoom completes the OIDC handshake. Zoom now knows exactly which user is authorizing access, so it can associate the consent grant with a real, verified identity.",
+      "risk": "If this token were intercepted or replayable, an attacker could complete the authorization flow without the real user present. Nonce values and short expiry windows prevent that kind of replay."
+    },
+    "agent_requests_scopes": {
+      "number": 8,
+      "caption": "Agent requests scopes - The agent declares exactly what it needs: read and write access to meetings. Nothing more. Scopes are the key upgrade over static API keys.",
+      "why": "Scoped access is what makes this fundamentally better than API keys. The agent declares exactly which permissions it needs, and both the user and Zoom can enforce least-privilege access. No more all-or-nothing.",
+      "risk": "If the agent requests overly broad scopes like admin-level access and the user blindly approves, the agent gains more power than its task requires. That widens the blast radius of any compromise."
+    },
+    "consent_shown": {
+      "number": 9,
+      "caption": "User grants consent - The user sees the specific permissions the agent is requesting and approves. Right here is where the human explicitly says \"yes, I want this agent to have these powers.\"",
+      "why": "User consent is the explicit delegation moment. The human confirms they want this specific agent to have these specific permissions. No silent access, no hidden data flows. The user is in control.",
+      "risk": "Consent fatigue is real though. If users reflexively click \"Allow\" without reading scopes, malicious agents can acquire broad permissions. Clear, specific scope descriptions are your defense here."
+    },
+    "zoom_issues_access_token": {
+      "number": 10,
+      "caption": "Zoom issues Access Token - Zoom mints an access token and hands it directly to the agent. Notice who's missing from this step: the IdP. The Identity Provider has no idea this just happened.",
+      "why": "Zoom issues the token directly because it's the resource owner's authorization server. Standard OAuth 2.0. But here's the catch: the token issuance happens entirely between Zoom and the agent, with the IdP left out.",
+      "risk": "And that's the core visibility gap. The IdP has no knowledge that Zoom just issued an access token to this agent. Your enterprise admin can't see, audit, or revoke this grant from the IdP console."
+    },
+    "agent_calls_api": {
+      "number": 11,
+      "caption": "Agent calls Zoom API - The agent uses its shiny new access token to fetch meeting recordings. Scoped, time-limited, and revocable. A big step up from a static API key.",
+      "why": "The agent now operates with a scoped, time-limited bearer token instead of a static API key. Fundamentally safer because the token can expire and be revoked independently of any other credential.",
+      "risk": "Even with scoped tokens, the IdP can't enforce cross-app policies. If the admin wants to revoke all agent access enterprise-wide, they have to visit each resource server individually. Zoom, Slack, Google, one by one."
+    },
+    "zoom_responds": {
+      "number": 12,
+      "caption": "Zoom returns data - Zoom validates the token and sends back the recordings. The flow works. But take a step back: the IdP was only involved for authentication, not for the authorization grant itself.",
+      "why": "Everything worked correctly: authentication, consent, scoped token. But the IdP was only involved for identity verification, not for the actual authorization decision. Zoom made that call on its own.",
+      "risk": "If this agent turns out to be malicious later, the admin has to hunt down which resource servers issued tokens to it, then revoke each one separately. No single kill switch at the IdP level. That's the gap this approach leaves open."
+    }
+  },
+  "flowSteps": [
+    "idle", "user_sso", "idp_validates", "idp_returns_id_token",
+    "agent_requests_zoom", "zoom_redirects_to_idp", "idp_validates_identity",
+    "idp_returns_id_token_to_zoom", "agent_requests_scopes", "consent_shown",
+    "zoom_issues_access_token", "agent_calls_api", "zoom_responds"
+  ],
+  "nodes": [
+    { "id": "user", "x": 64, "y": 180, "w": 200 },
+    { "id": "idp", "x": 480, "y": 180, "w": 240 },
+    { "id": "agent", "x": 64, "y": 420, "w": 200 },
+    { "id": "zoom", "x": 920, "y": 420, "w": 240 }
+  ],
+  "edges": [
+    { "id": "user-to-agent-delegation", "from": "agent", "to": "user", "label": "Works on behalf of User", "colorKey": "authBright", "alwaysVisible": true },
+    { "id": "agent-to-idp-sso", "from": "agent", "to": "idp", "label": "SSO (OIDC)", "colorKey": "auth", "pulseOn": "user_sso", "visibleOn": ["user_sso"] },
+    { "id": "idp-to-agent-id-token", "from": "idp", "to": "agent", "label": "id_token", "colorKey": "token", "pulseOn": "idp_returns_id_token", "visibleOn": ["idp_returns_id_token"] },
+    { "id": "agent-to-zoom-request", "from": "agent", "to": "zoom", "label": "Request Zoom Resources", "colorKey": "consent", "pulseOn": "agent_requests_zoom", "visibleOn": ["agent_requests_zoom"] },
+    { "id": "zoom-to-idp-verify", "from": "zoom", "to": "idp", "label": "SSO (OIDC)", "colorKey": "success", "pulseOn": "zoom_redirects_to_idp", "visibleOn": ["zoom_redirects_to_idp"] },
+    { "id": "idp-to-zoom-id-token", "from": "idp", "to": "zoom", "label": "id_token", "colorKey": "idToken", "pulseOn": "idp_returns_id_token_to_zoom", "visibleOn": ["idp_returns_id_token_to_zoom"] },
+    { "id": "agent-to-zoom-scopes", "from": "agent", "to": "zoom", "label": "Request Scopes (read, write)", "colorKey": "tokenAlt", "pulseOn": "agent_requests_scopes", "visibleOn": ["agent_requests_scopes"] },
+    { "id": "zoom-to-agent-token", "from": "zoom", "to": "agent", "label": "access_token", "colorKey": "error", "pulseOn": "zoom_issues_access_token", "visibleOn": ["zoom_issues_access_token"] },
+    { "id": "agent-to-zoom-api", "from": "agent", "to": "zoom", "label": "API Call using access_token", "colorKey": "api", "pulseOn": "agent_calls_api", "visibleOn": ["agent_calls_api"] },
+    { "id": "zoom-to-agent-response", "from": "zoom", "to": "agent", "label": "Response", "colorKey": "idToken", "pulseOn": "zoom_responds", "visibleOn": ["zoom_responds"] }
+  ],
+  "scopes": [
+    { "key": "meetings.read", "description": "Read meeting recordings" },
+    { "key": "meetings.write", "description": "Create & update meetings" }
+  ],
+  "insights": [
+    {
+      "id": "core-problem",
+      "stepId": "zoom_responds",
+      "title": "The Core Problem: Your IdP Is Flying Blind",
+      "variant": "mixed",
+      "description": "Zoom issues the access token directly to the AI Agent, and the IdP has no idea it happened. Your Identity Provider can verify identity but can't govern cross-app authorization.",
+      "sections": [
+        {
+          "heading": "What's Working Well",
+          "variant": "positive",
+          "items": [
+            "Your agent is a registered OAuth client, not just a script with a stolen key",
+            "Access is scoped and the user explicitly grants consent before anything flows",
+            "Tokens can be revoked and they expire, so access isn't permanent"
+          ]
+        },
+        {
+          "heading": "What's Still Missing",
+          "variant": "negative",
+          "items": [
+            "Your IdP has no clue that Zoom just issued a token to this agent",
+            "Admins can't see cross-app agent access from a single console",
+            "The IdP can't enforce policies on tokens it didn't issue"
+          ]
+        }
+      ]
+    }
+  ]
+}

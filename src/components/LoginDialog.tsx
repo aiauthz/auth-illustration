@@ -27,7 +27,7 @@ export function LoginDialog({
   open,
   onOpenChange,
   onLogin,
-  title = 'Sign in to Okta',
+  title = 'Sign in to Identity Provider',
   description = 'Enter your credentials to continue',
   defaultUsername = 'alex.chen@techcorp.com',
   defaultPassword = 'SecurePass123!',

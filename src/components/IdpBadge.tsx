@@ -7,7 +7,7 @@ interface IdpBadgeProps {
 }
 
 /**
- * Badge component for Identity Provider (Okta)
+ * Badge component for Identity Provider (IdP)
  */
 export function IdpBadge({ className }: IdpBadgeProps) {
   return (
@@ -15,7 +15,7 @@ export function IdpBadge({ className }: IdpBadgeProps) {
       <CardContent className="flex flex-col items-center justify-center p-6 gap-3 min-w-[200px]">
         <div className="flex items-center gap-2">
           <Shield className="h-8 w-8 text-primary" />
-          <div className="text-xl font-bold">Okta</div>
+          <div className="text-xl font-bold">Identity Provider</div>
         </div>
         <Badge variant="secondary">IDP</Badge>
         <div className="text-sm text-muted-foreground text-center">

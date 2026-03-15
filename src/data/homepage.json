@@ -1,0 +1,19 @@
+{
+  "hero": {
+    "title": "oauthflows",
+    "subtitle": "Finally understand OAuth 2.0, OpenID Connect, and modern identity flows — by watching them happen, step by step.",
+    "cta": "Start Learning"
+  },
+  "playground": {
+    "badges": ["Live", "New"],
+    "title": "OAuth Playground",
+    "description": "Plug in your own OAuth app and watch the entire flow unfold in real time. You'll see the actual HTTP requests your app makes, decode real JWTs with your own eyes, and follow every redirect with your own credentials. No fake data, no hand-waving."
+  },
+  "categories": {
+    "Foundations": { "color": "text-blue-400" },
+    "Core Flows": { "color": "text-emerald-400" },
+    "Deprecated": { "color": "text-red-400" },
+    "AI Agent Patterns": { "color": "text-purple-400" }
+  },
+  "categoryOrder": ["Foundations", "Core Flows", "Deprecated", "AI Agent Patterns"]
+}

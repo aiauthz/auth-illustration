@@ -1,0 +1,136 @@
+{
+  "title": "Cross App Access (Identity Assertion Authorization Grant)",
+  "steps": {
+    "idle": null,
+    "agent_sso": {
+      "number": 1,
+      "caption": "AI Agent performs SSO on behalf of user - The agent authenticates with the IdP on behalf of the user. Everything starts here. You need a verified identity before any token can be trusted.",
+      "why": "Authentication is the foundation of the whole chain. The IdP must verify the user's identity first so that every downstream token can be cryptographically traced back to an authenticated session. No identity, no trust.",
+      "risk": "Without an IdP-verified identity at the start, the entire token chain has no trust anchor. Any agent could fabricate identity claims and request cross-app tokens for arbitrary users."
+    },
+    "idp_returns_id_token": {
+      "number": 2,
+      "caption": "IdP issues ID Token to Agent - The IdP sends back an ID token proving the user's identity. Hold onto this one; it becomes the subject_token in the Token Exchange that's coming up.",
+      "why": "The ID token serves as the subject_token in the upcoming Token Exchange. Think of it as proof that the IdP personally authenticated this specific user. The agent will present it back to the IdP to request an ID-JAG.",
+      "risk": "If the ID token had an overly long lifetime or lacked audience restrictions, a compromised agent could use it to request ID-JAGs for many different target services over an extended period. Short-lived and tightly scoped keeps things safe."
+    },
+    "agent_requests_id_jag": {
+      "number": 3,
+      "caption": "Token Exchange: Agent requests ID-JAG - The agent sends a Token Exchange request to the IdP's token endpoint, presenting the ID token as subject_token and naming Zoom as the target audience. Here's where the magic happens.",
+      "why": "Token Exchange (RFC 8693) lets the agent trade a general identity proof for a purpose-built assertion scoped to a specific target. And here's where the IdP gains visibility into cross-app access: it sees which agent wants which resource for which user. That's the breakthrough.",
+      "risk": "Without the Token Exchange step, the agent would go directly to Zoom with just the ID token, completely bypassing the IdP's ability to evaluate policy, restrict scopes, or deny the request."
+    },
+    "idp_issues_id_jag": {
+      "number": 4,
+      "caption": "IdP issues ID-JAG (oauth-id-jag+jwt) - The IdP validates everything, evaluates policy, and mints a signed Identity Assertion JWT. Inside you'll find the audience, client_id, and approved scopes. Short-lived by design.",
+      "why": "The ID-JAG is a short-lived, audience-restricted, scope-limited assertion. The IdP embeds the agent's client_id and the approved scopes right in the JWT, creating a clear, auditable record of exactly what was authorized and for whom.",
+      "risk": "If the ID-JAG were long-lived, an attacker could exfiltrate it and replay it against Zoom for hours or days. The 300-second expiry ensures that even a stolen assertion becomes useless almost immediately."
+    },
+    "agent_presents_id_jag": {
+      "number": 5,
+      "caption": "JWT Bearer Grant: Agent presents ID-JAG to Zoom - The agent takes that ID-JAG and presents it to Zoom's token endpoint using the jwt-bearer grant type. No browser redirect needed. No user interaction.",
+      "why": "The JWT Bearer grant (RFC 7523) lets the agent present the IdP-signed assertion directly to Zoom without requiring a browser redirect or user interaction. That enables non-interactive, server-to-server cross-app access. Perfect for agents.",
+      "risk": "If Zoom accepted arbitrary JWTs without strict typ and audience validation, an attacker could present a random JWT from any issuer to obtain access tokens, completely bypassing the IdP trust model."
+    },
+    "zoom_validates_id_jag": {
+      "number": 6,
+      "caption": "Zoom validates ID-JAG - Zoom inspects the JWT carefully: checks the typ is \"oauth-id-jag+jwt\", verifies the signature using the IdP's JWKS, confirms the audience matches its own issuer URL, and validates the client_id.",
+      "why": "Multi-layer validation is critical here. Checking the typ prevents confusion with other JWT types. JWKS signature verification proves the IdP actually issued it. Audience validation ensures the assertion was meant for Zoom specifically. Every check matters.",
+      "risk": "Skip any single check and you open an attack vector. Without typ validation, a regular ID token could be confused for an ID-JAG. Without audience checking, an assertion meant for Slack could be replayed against Zoom."
+    },
+    "zoom_issues_access_token": {
+      "number": 7,
+      "caption": "Zoom issues Access Token (IdP-Aware) - Zoom mints an access token, but only because the IdP explicitly authorized it via the ID-JAG. Notice the difference from slide 4: the IdP is in the loop this time.",
+      "why": "Zoom issues the access token only because the IdP explicitly authorized it through the ID-JAG. The scopes in the access token are bounded by what the IdP approved. Your IdP now has effective control over resource-server authorization. That's the game changer.",
+      "risk": "If Zoom issued broader scopes than the ID-JAG specified, it would undermine the IdP's policy decisions. Resource servers must treat the ID-JAG scopes as an upper bound, not a suggestion."
+    },
+    "agent_calls_api": {
+      "number": 8,
+      "caption": "Agent calls Zoom API - The agent makes its API call with a token whose provenance is fully traceable: the IdP authenticated the user, approved the cross-app grant, and the scopes reflect IdP policy.",
+      "why": "The agent now operates with a token that has a complete chain of custody. The IdP authenticated the user, approved the cross-app grant, and the scopes reflect IdP policy. Every API call is indirectly governed by the IdP.",
+      "risk": "If the access token gets exfiltrated, the damage is limited to the scopes the IdP approved and the token's own expiry. The admin can revoke future ID-JAG issuance at the IdP to cut off the agent entirely. One kill switch."
+    },
+    "zoom_responds": {
+      "number": 9,
+      "caption": "Zoom responds with data - Zoom returns the requested data. The full flow worked, and here's what matters: the IdP had visibility the entire time. Your admin knows who accessed what, through which agent, with which permissions.",
+      "why": "The complete flow preserves a centralized audit trail. The IdP knows which user, which agent, which resource, and which scopes were involved. Your enterprise finally gets a single pane of glass for cross-app agent access.",
+      "risk": "One operational detail to keep in mind: because the ID-JAG is short-lived and Zoom doesn't issue refresh tokens in this flow, the agent must re-request an ID-JAG from the IdP for continued access. That's actually a feature, not a bug, because it forces ongoing policy evaluation."
+    }
+  },
+  "flowSteps": [
+    "idle", "agent_sso", "idp_returns_id_token", "agent_requests_id_jag",
+    "idp_issues_id_jag", "agent_presents_id_jag", "zoom_validates_id_jag",
+    "zoom_issues_access_token", "agent_calls_api", "zoom_responds"
+  ],
+  "nodes": [
+    { "id": "user", "x": 64, "y": 180, "w": 200 },
+    { "id": "idp", "x": 480, "y": 180, "w": 240 },
+    { "id": "agent", "x": 64, "y": 420, "w": 200, "roleLabel": { "text": "Requesting App", "color": "blue" } },
+    { "id": "zoom", "x": 920, "y": 420, "w": 240, "roleLabel": { "text": "Resource App", "color": "purple" } }
+  ],
+  "edges": [
+    { "id": "user-to-agent-delegation", "from": "agent", "to": "user", "label": "Works on behalf of User", "colorKey": "authBright", "alwaysVisible": true },
+    { "id": "agent-to-idp-sso", "from": "agent", "to": "idp", "label": "SSO (OIDC)", "colorKey": "auth", "pulseOn": "agent_sso", "visibleOn": ["agent_sso"] },
+    { "id": "idp-to-agent-id-token", "from": "idp", "to": "agent", "label": "ID Token", "colorKey": "token", "pulseOn": "idp_returns_id_token", "visibleOn": ["idp_returns_id_token"] },
+    { "id": "agent-to-idp-request-jag", "from": "agent", "to": "idp", "label": "Token Exchange (ID-JAG)", "colorKey": "consent", "pulseOn": "agent_requests_id_jag", "visibleOn": ["agent_requests_id_jag"] },
+    { "id": "idp-to-agent-jag", "from": "idp", "to": "agent", "label": "ID-JAG", "colorKey": "success", "pulseOn": "idp_issues_id_jag", "visibleOn": ["idp_issues_id_jag"] },
+    { "id": "agent-to-zoom-jag", "from": "agent", "to": "zoom", "label": "JWT Bearer + ID-JAG", "colorKey": "tokenAlt", "pulseOn": "agent_presents_id_jag", "visibleOn": ["agent_presents_id_jag"] },
+    { "id": "zoom-to-idp-validate", "from": "zoom", "to": "idp", "label": "Validate via JWKS", "colorKey": "api", "pulseOn": "zoom_validates_id_jag", "visibleOn": ["zoom_validates_id_jag"] },
+    { "id": "zoom-to-agent-token", "from": "zoom", "to": "agent", "label": "Access Token", "colorKey": "success", "pulseOn": "zoom_issues_access_token", "visibleOn": ["zoom_issues_access_token"] },
+    { "id": "agent-to-zoom-api", "from": "agent", "to": "zoom", "label": "API Call", "colorKey": "apiAlt", "pulseOn": "agent_calls_api", "visibleOn": ["agent_calls_api"] },
+    { "id": "zoom-to-agent-response", "from": "zoom", "to": "agent", "label": "Response", "colorKey": "idToken", "pulseOn": "zoom_responds", "visibleOn": ["zoom_responds"] }
+  ],
+  "insights": [
+    {
+      "id": "id-jag-explanation",
+      "stepId": "idp_issues_id_jag",
+      "title": "Identity Assertion JWT (ID-JAG)",
+      "variant": "positive",
+      "sections": [
+        {
+          "heading": "What Exactly Is It?",
+          "variant": "positive",
+          "items": [
+            "A signed JWT with typ \"oauth-id-jag+jwt\" that the IdP issues through Token Exchange (RFC 8693)",
+            "Your IdP's way of explicitly authorizing cross-app access while keeping full visibility"
+          ]
+        },
+        {
+          "heading": "Key Claims Inside",
+          "variant": "neutral",
+          "items": [
+            "aud is set to zoom.example.com, so the assertion only works at Zoom",
+            "client_id identifies the specific agent that requested access",
+            "scope is locked to meetings.read and recordings.read, nothing broader",
+            "exp is set to 300 seconds, making stolen assertions useless almost immediately"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "problem-solved",
+      "stepId": "zoom_responds",
+      "title": "Problem Solved: Your IdP Sees Everything",
+      "variant": "positive",
+      "description": "Zoom only issues the access token after validating the ID-JAG from the IdP. Your Identity Provider maintains full visibility and control over cross-app agent access.",
+      "sections": [
+        {
+          "heading": "What You Gain",
+          "variant": "positive",
+          "items": [
+            "Your admin finally has visibility into which agents access which resources across apps",
+            "Authorization decisions flow through the IdP, giving you centralized policy control"
+          ]
+        },
+        {
+          "heading": "Security Wins",
+          "variant": "positive",
+          "items": [
+            "Assertions expire in 300 seconds, so stolen tokens are useless almost immediately",
+            "No refresh tokens from the resource server means the agent must re-prove itself through the IdP every time"
+          ]
+        }
+      ]
+    }
+  ]
+}

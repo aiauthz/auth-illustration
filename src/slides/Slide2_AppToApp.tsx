@@ -9,6 +9,7 @@ import { Terminal, X } from 'lucide-react'
 
 import { edgeColors } from '@/lib/colors'
 import { cn } from '@/lib/utils'
+import slideData from '@/data/slide2-app-to-app.json'
 
 type FlowStep =
   | 'idle'
@@ -22,46 +23,7 @@ type FlowStep =
   | 'api_call'
   | 'api_response'
 
-// Step metadata for captions and sequence numbers
-const stepMetadata: Record<FlowStep, { number: number; caption: string } | null> = {
-  idle: null,
-  calendar_to_zoom: {
-    number: 1,
-    caption: 'User wants to connect Calendar to Zoom - Calendar app initiates connection to access Zoom API on behalf of the user',
-  },
-  zoom_sso_request: {
-    number: 2,
-    caption: 'SSO (OIDC) - Zoom redirects to IDP (Okta) for user authentication to verify user identity',
-  },
-  idp_validates: {
-    number: 3,
-    caption: 'IDP validates user identity - Okta verifies the user credentials and validates their identity',
-  },
-  id_token_received: {
-    number: 4,
-    caption: 'ID token received - Zoom receives ID token from IDP confirming user identity',
-  },
-  scope_request: {
-    number: 5,
-    caption: 'Calendar requests scopes - Calendar app requests specific permissions (meeting.read, meeting.write) from Zoom',
-  },
-  consent_shown: {
-    number: 6,
-    caption: 'User grants consent - User approves Calendar app to access Zoom API with requested permissions',
-  },
-  access_token_issued: {
-    number: 7,
-    caption: 'Access token issued - Zoom issues its own access token to Calendar app with approved scopes',
-  },
-  api_call: {
-    number: 8,
-    caption: 'API call with token - Calendar app calls Zoom API to create a meeting, including the access token in the Authorization header',
-  },
-  api_response: {
-    number: 9,
-    caption: 'API response received - Zoom API successfully creates the meeting and returns meeting details including the join URL',
-  },
-}
+const stepMetadata = slideData.steps as Record<FlowStep, { number: number; caption: string; why?: string; risk?: string } | null>
 
 /**
  * Slide 2: App-to-App via OAuth: Google Calendar <-> Zoom
@@ -74,71 +36,14 @@ export function Slide2_AppToApp() {
   const [zoomAccessToken, setZoomAccessToken] = useState<string | null>(null)
   const [isValidated, setIsValidated] = useState(false)
 
-  const nodes = [
-    { id: 'calendar', x: 100, y: 320, w: 260 },
-    { id: 'okta', x: 510, y: 80, w: 240 },
-    { id: 'zoom', x: 920, y: 320, w: 260 },
-  ]
+  const nodes = slideData.nodes
 
-  const edges = [
-    {
-      id: 'calendar-to-zoom-connect',
-      from: 'calendar',
-      to: 'zoom',
-      label: 'Connect / Access Zoom',
-      color: edgeColors.auth,
-      visible: flowStep === 'calendar_to_zoom',
-    },
-    {
-      id: 'zoom-to-okta-sso',
-      from: 'zoom',
-      to: 'okta',
-      label: 'SSO (OIDC)',
-      color: edgeColors.consent,
-      pulse: flowStep === 'zoom_sso_request',
-      visible: flowStep === 'zoom_sso_request',
-    },
-    {
-      id: 'okta-to-zoom-id-token',
-      from: 'okta',
-      to: 'zoom',
-      label: 'ID Token',
-      color: edgeColors.idToken,
-      visible: flowStep === 'id_token_received',
-    },
-    {
-      id: 'calendar-to-zoom-scope-request',
-      from: 'calendar',
-      to: 'zoom',
-      label: 'Request Scopes (meeting.read, meeting.write)',
-      color: edgeColors.token,
-      visible: flowStep === 'scope_request',
-    },
-    {
-      id: 'zoom-to-calendar-access-token',
-      from: 'zoom',
-      to: 'calendar',
-      label: 'Access Token (Zoom)',
-      color: edgeColors.success,
-      visible: flowStep === 'access_token_issued',
-    },
-    {
-      id: 'calendar-to-zoom-api-request',
-      from: 'calendar',
-      to: 'zoom',
-      label: 'POST /meetings (Bearer ...)',
-      color: edgeColors.api,
-      visible: flowStep === 'api_call',
-    },
-    {
-      id: 'zoom-to-calendar-api-response',
-      from: 'zoom',
-      to: 'calendar',
-      label: 'Meeting Created (200 OK)',
-      color: edgeColors.successBright,
-      visible: flowStep === 'api_response',
-    },
-  ]
+  const edges = slideData.edges.map((e) => ({
+    ...e,
+    color: edgeColors[e.colorKey as keyof typeof edgeColors],
+    pulse: e.pulseOn === flowStep,
+    visible: e.visibleOn.includes(flowStep),
+  }))
 
   const handleStartFlow = () => {
     setFlowStep('calendar_to_zoom')
@@ -239,10 +144,7 @@ export function Slide2_AppToApp() {
     setShowTerminal(false)
   }
 
-  const scopes = [
-    { key: 'meeting.read', description: 'Read meeting details' },
-    { key: 'meeting.write', description: 'Schedule & update meetings' },
-  ]
+  const scopes = slideData.scopes
 
   const canGoNext =
     flowStep !== 'idle' &&
@@ -253,34 +155,7 @@ export function Slide2_AppToApp() {
   const canGoPrevious =
     flowStep !== 'idle'
 
-  const insightEntries: InsightEntry[] = [
-    {
-      id: 'pros-cons',
-      stepId: 'api_response',
-      title: 'Standard OAuth 2.0 App-to-App',
-      variant: 'mixed',
-      sections: [
-        {
-          heading: 'Pros',
-          variant: 'positive',
-          items: [
-            '• Scoped access (meeting.read, meeting.write)',
-            '• User grants explicit consent',
-            '• Revocable tokens with expiration',
-          ],
-        },
-        {
-          heading: 'Cons',
-          variant: 'negative',
-          items: [
-            '• Each app pair requires separate OAuth setup',
-            '• IdP not involved in token issuance between apps',
-            '• No centralized visibility of cross-app access',
-          ],
-        },
-      ],
-    },
-  ]
+  const insightEntries = slideData.insights as InsightEntry[]
 
   // Auto-validate after showing validation spinner
   useEffect(() => {
@@ -297,18 +172,7 @@ export function Slide2_AppToApp() {
     }
   }, [flowStep, isValidated])
 
-  const FLOW_STEPS: FlowStep[] = [
-    'idle',
-    'calendar_to_zoom',
-    'zoom_sso_request',
-    'idp_validates',
-    'id_token_received',
-    'scope_request',
-    'consent_shown',
-    'access_token_issued',
-    'api_call',
-    'api_response',
-  ]
+  const FLOW_STEPS = slideData.flowSteps as FlowStep[]
   const stepIndex = FLOW_STEPS.indexOf(flowStep)
   const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
 
@@ -321,7 +185,7 @@ export function Slide2_AppToApp() {
         stepId: 'zoom_sso_request',
         label: '/authorize',
         method: 'GET',
-        url: 'https://okta.example.com/authorize',
+        url: 'https://idp.example.com/authorize',
         headers: [],
         queryParams: {
           response_type: 'code',
@@ -344,11 +208,11 @@ export function Slide2_AppToApp() {
 
     if (reached('id_token_received')) {
       entries.push({
-        id: 'okta-token',
+        id: 'idp-token',
         stepId: 'id_token_received',
         label: '/oauth/token',
         method: 'POST',
-        url: 'https://okta.example.com/oauth/token',
+        url: 'https://idp.example.com/oauth/token',
         headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }],
         body: {
           grant_type: 'authorization_code',
@@ -475,7 +339,7 @@ export function Slide2_AppToApp() {
 
   return (
     <SlideLayout
-      title="App-to-App Integration: Calendar ↔ Zoom"
+      title={slideData.title}
       flowStep={flowStep}
       stepMetadata={stepMetadata}
       onStart={handleStartFlow}
@@ -484,14 +348,14 @@ export function Slide2_AppToApp() {
       onReset={handleReset}
       canGoNext={canGoNext}
       canGoPrevious={canGoPrevious}
-      startLabel="Start OAuth Flow"
+      startLabel={slideData.startLabel}
     >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
-          {/* IDP Validation Indicator - positioned to the right of Okta node */}
+          {/* IDP Validation Indicator - positioned to the right of IdP node */}
           {flowStep === 'idp_validates' && (
-            <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" position="right" />
+            <ValidationIndicatorPositioned isValidated={isValidated} nodeId="idp" position="right" />
           )}
 
         </Stage>

@@ -8,6 +8,7 @@ import { makeJwt } from '@/lib/tokens'
 import { edgeColors } from '@/lib/colors'
 import { Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import slideData from '@/data/slide1-oauth-consent.json'
 
 type FlowStep =
   | 'idle'
@@ -17,39 +18,9 @@ type FlowStep =
   | 'idp_validates'
   | 'tokens_received'
 
-// Step metadata for captions and sequence numbers
-const stepMetadata: Record<FlowStep, { number: number; caption: string } | null> = {
-  idle: null,
-  user_clicks_login: {
-    number: 1,
-    caption: 'User clicks "Sign in" - User wants to access Google Calendar and clicks the login button to start the authentication process',
-  },
-  auth_request: {
-    number: 2,
-    caption: 'Calendar app initiates SSO - Calendar redirects to Okta with client_id, redirect_uri, and state parameters',
-  },
-  login_shown: {
-    number: 3,
-    caption: 'Okta presents login screen - User enters their username and password to authenticate with the Identity Provider',
-  },
-  idp_validates: {
-    number: 4,
-    caption: 'IDP validates user identity - Okta verifies the user credentials and validates their identity',
-  },
-  tokens_received: {
-    number: 5,
-    caption: 'Authentication complete - Calendar app receives ID token containing user identity information and can now authenticate the user',
-  },
-}
+const stepMetadata = slideData.steps as Record<FlowStep, { number: number; caption: string; why?: string; risk?: string } | null>
 
-const FLOW_STEPS: FlowStep[] = [
-  'idle',
-  'user_clicks_login',
-  'auth_request',
-  'login_shown',
-  'idp_validates',
-  'tokens_received',
-]
+const FLOW_STEPS = slideData.flowSteps as FlowStep[]
 
 /**
  * Slide 1: Basic OIDC Authentication Flow
@@ -77,7 +48,7 @@ export function Slide1_OAuthConsent() {
         stepId: 'auth_request',
         label: 'GET /authorize (OIDC SSO redirect)',
         method: 'GET',
-        url: 'https://okta.example.com/authorize',
+        url: 'https://idp.example.com/authorize',
         headers: [],
         queryParams: {
           response_type: 'code',
@@ -94,7 +65,7 @@ export function Slide1_OAuthConsent() {
           headers: [
             {
               name: 'Location',
-              value: 'https://okta.example.com/login?session=abc',
+              value: 'https://idp.example.com/login?session=abc',
             },
           ],
           body: null,
@@ -109,7 +80,7 @@ export function Slide1_OAuthConsent() {
         stepId: 'tokens_received',
         label: 'POST /oauth/token (token exchange)',
         method: 'POST',
-        url: 'https://okta.example.com/oauth/token',
+        url: 'https://idp.example.com/oauth/token',
         headers: [
           { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
         ],
@@ -143,41 +114,14 @@ export function Slide1_OAuthConsent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowStep])
 
-  const nodes = [
-    { id: 'user', x: 64, y: 240, w: 220 },
-    { id: 'calendar', x: 480, y: 240, w: 260 },
-    { id: 'okta', x: 1000, y: 240, w: 240 },
-  ]
+  const nodes = slideData.nodes
 
-  const edges = [
-    {
-      id: 'user-to-calendar',
-      from: 'user',
-      to: 'calendar',
-      label: 'Clicks "Sign in"',
-      color: edgeColors.authBright,
-      pulse: flowStep === 'user_clicks_login',
-      visible: flowStep === 'user_clicks_login',
-    },
-    {
-      id: 'calendar-to-okta',
-      from: 'calendar',
-      to: 'okta',
-      label: 'SSO (OIDC)',
-      color: edgeColors.auth,
-      pulse: flowStep === 'auth_request',
-      visible: flowStep === 'auth_request',
-    },
-    {
-      id: 'okta-to-calendar-token',
-      from: 'okta',
-      to: 'calendar',
-      label: 'ID Token',
-      color: edgeColors.idToken,
-      pulse: flowStep === 'tokens_received',
-      visible: flowStep === 'tokens_received',
-    },
-  ]
+  const edges = slideData.edges.map((e) => ({
+    ...e,
+    color: edgeColors[e.colorKey as keyof typeof edgeColors],
+    pulse: e.pulseOn === flowStep,
+    visible: e.visibleOn.includes(flowStep),
+  }))
 
   const handleStartOAuth = () => {
     setFlowStep('user_clicks_login')
@@ -201,7 +145,7 @@ export function Slide1_OAuthConsent() {
         const newIdToken = makeJwt({
           sub: username || 'user@example.com',
           email: username || 'user@example.com',
-          iss: 'https://okta.example.com',
+          iss: 'https://idp.example.com',
           aud: 'google-calendar-client-id',
         })
         setIdToken(newIdToken)
@@ -274,7 +218,7 @@ export function Slide1_OAuthConsent() {
 
   return (
     <SlideLayout
-      title="Basic OIDC Authentication Flow"
+      title={slideData.title}
       flowStep={flowStep}
       stepMetadata={stepMetadata}
       onStart={handleStartOAuth}
@@ -283,14 +227,14 @@ export function Slide1_OAuthConsent() {
       onReset={handleReset}
       canGoNext={canGoNext}
       canGoPrevious={canGoPrevious}
-      startLabel="Start OAuth Flow"
+      startLabel={slideData.startLabel}
     >
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
-          {/* IDP Validation Indicator - positioned directly above Okta node */}
+          {/* IDP Validation Indicator - positioned directly above IdP node */}
           {flowStep === 'idp_validates' && (
-            <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" />
+            <ValidationIndicatorPositioned isValidated={isValidated} nodeId="idp" />
           )}
 
         </Stage>

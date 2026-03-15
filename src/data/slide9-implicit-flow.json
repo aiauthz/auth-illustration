@@ -1,0 +1,114 @@
+{
+  "title": "Implicit Grant (DEPRECATED)",
+  "startLabel": "Start Implicit Flow",
+  "steps": {
+    "idle": null,
+    "spa_redirects": {
+      "number": 1,
+      "caption": "Your SPA redirects to the auth server with response_type=token — not \"code\". That one parameter change tells the server to return the access token directly. No intermediate authorization code, no token exchange step.",
+      "why": "Back in 2012, browsers didn't support CORS. Your SPA literally could not make a cross-origin POST to exchange an authorization code for a token. Returning the token directly in the redirect was the only way to get it into a JavaScript application without a backend proxy.",
+      "risk": "By skipping the code-exchange step, the flow loses the ability to authenticate the client or bind the token to the original request. Any application that intercepts the redirect URL walks away with a usable access token and no further verification required."
+    },
+    "user_authenticates": {
+      "number": 2,
+      "caption": "The user authenticates at the authorization server's login screen. After successful auth, the server prepares to return the token directly — and here's where things start to diverge from a secure flow.",
+      "why": "User authentication still happens at the authorization server, so your SPA never sees the user's credentials. That's the one security property the Implicit flow actually retains from the Authorization Code flow.",
+      "risk": "Because there's no code exchange after authentication, the auth server can't verify that the party receiving the token is the same SPA that initiated the request. An attacker who injects a different redirect_uri through an open-redirect vulnerability receives the token instead of your app."
+    },
+    "auth_returns_token_in_fragment": {
+      "number": 3,
+      "caption": "The auth server redirects back with the access token sitting in the URL fragment: #access_token=... Notice the hash. The fragment never gets sent to the server — it stays in the browser. Back in the day, people thought this was a clever trick for SPAs.",
+      "why": "URL fragments were chosen specifically because browsers don't include the fragment in HTTP requests. The token wouldn't be sent to the web server on the redirect, keeping it client-side only. A creative workaround for the lack of CORS and secure client-side storage in early browsers — but creative workarounds age poorly.",
+      "risk": "The fragment trick has severe leakage vectors. The full URL with fragment gets stored in browser history, can be read by browser extensions, leaks via document.referrer to analytics tools, and persists right there in the address bar. Anyone with access to the browser history or an injected script can extract the token."
+    },
+    "spa_extracts_token": {
+      "number": 4,
+      "caption": "Your SPA JavaScript reads window.location.hash to extract the access token. The token now lives in browser memory. Notice what didn't happen: no client authentication, no PKCE challenge verified. Nothing.",
+      "why": "Without PKCE, which hadn't been invented yet, there was no way to prove that the JavaScript extracting the token was the same application that started the flow. The token is a bearer credential — whoever has it can use it, regardless of how they got it.",
+      "risk": "Token-substitution attacks become trivial. An attacker obtains a valid token from browser history, logs, or a malicious browser extension, then injects it into their own session. Your API can't tell the difference because there's no client binding or code verifier to check."
+    },
+    "spa_calls_api": {
+      "number": 5,
+      "caption": "Your SPA uses the token to call the API. And sure, it works. But take a step back and notice what's missing: no refresh token was issued, the token is sitting in browser history, and there's no way to verify this token was actually issued for your client.",
+      "why": "The OAuth spec explicitly forbids issuing refresh tokens in the Implicit flow because there's nowhere secure to store them in a browser-only environment. Without a backend, you have no httpOnly cookie or server-side session to protect a long-lived refresh token.",
+      "risk": "Without refresh tokens, the access token needs a long lifetime to avoid forcing frequent re-logins. But a long-lived token in the browser means a wider window for theft. You're stuck in a lose-lose trade-off: short tokens break the user experience, long tokens amplify the damage of any leak."
+    },
+    "api_response": {
+      "number": 6,
+      "caption": "The API responds successfully. The flow technically \"works\" — and that's exactly the problem. The critical security flaws that led to its deprecation in OAuth 2.1 are invisible during happy-path testing.",
+      "why": "The flow delivers a working token and achieves the goal of calling an API. Precisely because of this, it persisted for years. \"It works\" isn't the same as \"it's safe,\" and deprecation required the industry to finally acknowledge that difference.",
+      "risk": "Browser history exposure is the most critical and most underestimated attack vector here. Users share computers, use public terminals, or leave browsers open. A single Back button press or history search reveals the full callback URL with the access token embedded in the fragment. No exploit or malware needed."
+    },
+    "security_problems": {
+      "number": 7,
+      "caption": "DEPRECATED: OAuth 2.1 removes the Implicit Grant entirely. Use Authorization Code + PKCE instead — you get the same SPA support with proper security: code exchange, client binding, no token in the URL.",
+      "why": "PKCE (Proof Key for Code Exchange) solves the exact problem Implicit was designed to work around. With CORS now universally supported, your SPA can make cross-origin POST requests to exchange a code for a token. PKCE adds a code_verifier that cryptographically binds the token to the original request, eliminating token injection and interception.",
+      "risk": "Continuing to use the Implicit flow when PKCE is available gives you zero security benefits and all of the known attack vectors: token leakage via browser history, Referer headers, and open redirects; no client binding; no refresh tokens; and no path to improvement. Every OAuth security BCP since 2018 explicitly recommends against it."
+    }
+  },
+  "flowSteps": [
+    "idle", "spa_redirects", "user_authenticates", "auth_returns_token_in_fragment",
+    "spa_extracts_token", "spa_calls_api", "api_response", "security_problems"
+  ],
+  "nodes": [
+    { "id": "browser", "x": 100, "y": 280, "w": 240 },
+    { "id": "authServer", "x": 510, "y": 280, "w": 260 },
+    { "id": "service", "x": 920, "y": 280, "w": 240 }
+  ],
+  "edges": [
+    { "id": "spa-to-auth-redirect", "from": "browser", "to": "authServer", "label": "GET /authorize (response_type=token)", "colorKey": "auth", "pulseOn": "spa_redirects", "visibleOn": ["spa_redirects", "user_authenticates"] },
+    { "id": "auth-to-spa-fragment", "from": "authServer", "to": "browser", "label": "Redirect #access_token=eyJ...", "colorKey": "error", "pulseOn": "auth_returns_token_in_fragment", "visibleOn": ["auth_returns_token_in_fragment", "spa_extracts_token"] },
+    { "id": "spa-to-api", "from": "browser", "to": "service", "label": "GET /api (Bearer ...)", "colorKey": "api", "visibleOn": ["spa_calls_api"] },
+    { "id": "api-to-spa", "from": "service", "to": "browser", "label": "Data (200 OK)", "colorKey": "successBright", "visibleOn": ["api_response", "security_problems"] }
+  ],
+  "insights": [
+    {
+      "id": "why-deprecated",
+      "stepId": "security_problems",
+      "title": "Why the Implicit Grant Got Deprecated",
+      "variant": "negative",
+      "description": "OAuth 2.1 removes this grant entirely, and for good reason. Let's walk through exactly why.",
+      "sections": [
+        {
+          "heading": "Token Exposure (the Critical Problem)",
+          "variant": "negative",
+          "items": [
+            "Your access token shows up right in the browser URL bar for anyone looking over a shoulder to see",
+            "The token gets stored in browser history, meaning anyone with access to the machine can steal it later",
+            "The HTTP Referer header can leak your token to third-party resources loaded on the page",
+            "Server logs may capture the full redirect URL with the token embedded in it"
+          ]
+        },
+        {
+          "heading": "No Way to Verify the Client",
+          "variant": "negative",
+          "items": [
+            "No client authentication happens, so any app can claim to be your client",
+            "Token substitution attacks become easy — an attacker just injects a stolen token into their session",
+            "You have no mechanism to verify the token was actually issued for your specific application",
+            "Without PKCE, nothing binds the token to the original authorization request"
+          ]
+        },
+        {
+          "heading": "Features You Lose",
+          "variant": "negative",
+          "items": [
+            "No refresh token gets issued, so your user must re-authenticate every time the token expires",
+            "URL fragments have length limits that can silently truncate large tokens",
+            "You can't request a narrower scope on renewal because there's no renewal mechanism at all"
+          ]
+        },
+        {
+          "heading": "Why It Existed in the First Place",
+          "variant": "neutral",
+          "items": [
+            "Back in 2012, CORS didn't exist and SPAs had no way to make cross-origin POST requests",
+            "SPAs couldn't exchange an authorization code for a token without a backend proxy",
+            "PKCE and universal CORS support made this workaround completely unnecessary",
+            "For any SPA you're building today, use Authorization Code + PKCE — it's the right answer"
+          ]
+        }
+      ]
+    }
+  ]
+}

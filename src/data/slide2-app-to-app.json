@@ -1,0 +1,112 @@
+{
+  "title": "App-to-App Integration: Calendar ↔ Zoom",
+  "startLabel": "Start OAuth Flow",
+  "steps": {
+    "idle": null,
+    "calendar_to_zoom": {
+      "number": 1,
+      "caption": "User wants to connect Calendar to Zoom - Your user needs Calendar to talk to Zoom. So Calendar reaches out to the Zoom API, asking to act on the user's behalf.",
+      "why": "Calendar needs to create Zoom meetings for your user, but storing Zoom passwords is a terrible idea. OAuth lets Calendar request narrowly scoped access without ever seeing a single credential. Much cleaner.",
+      "risk": "Without OAuth, Calendar would literally need the user's Zoom username and password. One breach of Calendar, and attackers now have full Zoom access for every connected user. Not just meetings, everything."
+    },
+    "zoom_sso_request": {
+      "number": 2,
+      "caption": "SSO (OIDC) - Zoom kicks the user over to the IdP for identity verification. Before issuing any tokens, Zoom needs to know exactly who this person is.",
+      "why": "Before Zoom hands out access tokens, it needs to confirm the user's identity through the corporate IdP. That way, Zoom relies on the same identity source as every other enterprise app. Offboard someone in the IdP, and they're locked out everywhere at once.",
+      "risk": "If Zoom kept its own user database, a terminated employee could still hold active Zoom credentials long after IT revoked their corporate account. Your organization loses centralized control over who can authorize integrations."
+    },
+    "idp_validates": {
+      "number": 3,
+      "caption": "IDP validates user identity - The IdP runs the user through its full authentication gauntlet: credentials, MFA, device trust, the works.",
+      "why": "The IdP applies your organization's security policies across the board. MFA requirements, device trust checks, conditional access rules. One enforcement point protecting every downstream app in the chain.",
+      "risk": "Without centralized validation, each app rolls its own auth logic with wildly inconsistent security posture. The weakest app becomes the entry point for attackers to move laterally across your entire integration chain."
+    },
+    "id_token_received": {
+      "number": 4,
+      "caption": "ID token received - Zoom gets an ID token from the IdP confirming the user's identity. Now Zoom knows who's asking, and the consent step can build on this foundation.",
+      "why": "The ID token is cryptographically signed proof of identity. Zoom verifies the JWT signature against the IdP's public keys, establishing trust without touching passwords. Think of it as a notarized letter of introduction.",
+      "risk": "If Zoom accepted unverified identity claims, an attacker could impersonate any user and trick Calendar into acting on their behalf. Token replay attacks would also be possible if the audience and nonce claims weren't properly validated."
+    },
+    "scope_request": {
+      "number": 5,
+      "caption": "Calendar requests scopes - Calendar tells Zoom exactly what it needs: meeting.read and meeting.write. Nothing more. Least privilege in action.",
+      "why": "Scopes enforce the principle of least privilege. Calendar asks only for meeting.read and meeting.write. Not user.admin. Not recording.delete. Each app-to-app pair defines its own scope set because different integrations need different permissions.",
+      "risk": "Without scopes, Calendar would get a token with full Zoom API access. A single vulnerability in Calendar could then be exploited to delete recordings, change account settings, or exfiltrate data way beyond the original meeting-creation use case."
+    },
+    "consent_shown": {
+      "number": 6,
+      "caption": "User grants consent - The user sees exactly what Calendar is asking for and clicks approve. They're in control of what data flows between their apps.",
+      "why": "Consent puts your user in the driver's seat. They explicitly see which permissions Calendar wants and can say no. That transparency is critical for regulatory compliance like GDPR and SOC 2, and it builds genuine trust.",
+      "risk": "Without a consent step, apps could silently tap into each other's APIs. A malicious or compromised app could siphon data from Zoom without the user ever knowing. Your organization would have zero audit trail of who authorized what."
+    },
+    "access_token_issued": {
+      "number": 7,
+      "caption": "Access token issued - Zoom mints its own access token and hands it to Calendar. Notice how Zoom issues this token directly, not the IdP.",
+      "why": "Here's the thing: Zoom creates its own access token rather than sharing the IdP token. That token is scoped only to the Zoom API, has a short expiry, and Zoom can revoke it independently. Each app-to-app pair manages its own token lifecycle.",
+      "risk": "If the IdP token were reused directly, revoking it would break every integration at once. A shared token also can't enforce per-service scopes, so an attacker who intercepts one token gains access to every service that accepts it."
+    },
+    "api_call": {
+      "number": 8,
+      "caption": "API call with token - Calendar fires off a POST to Zoom's meeting endpoint with the access token in the Authorization header. Standard Bearer token stuff.",
+      "why": "That Bearer token in the Authorization header is how Zoom confirms Calendar is allowed to act on the user's behalf. Zoom checks the token's signature, expiry, and scopes on every single request. Continuous enforcement, not just a one-time gate.",
+      "risk": "Send that token over an unencrypted channel and an attacker can intercept it to make API calls as Calendar. If Calendar doesn't store the token securely, a server breach exposes the ability to create or read meetings for all connected users."
+    },
+    "api_response": {
+      "number": 9,
+      "caption": "API response received - Zoom creates the meeting and sends back the details, including the join URL. The whole chain worked: identity, scopes, consent, token validation.",
+      "why": "The successful response proves the entire chain held together: identity verification, scope delegation, consent, and token validation. But notice something important. The IdP wasn't involved in this final API call. Zoom validated its own token, not the IdP's.",
+      "risk": "Because each app pair manages its own OAuth relationship, your organization has no centralized view of which apps can access which APIs. If Calendar's token gets compromised, only Zoom's own monitoring can detect the misuse. The IdP can't see or revoke tokens it didn't issue."
+    }
+  },
+  "flowSteps": [
+    "idle", "calendar_to_zoom", "zoom_sso_request", "idp_validates",
+    "id_token_received", "scope_request", "consent_shown",
+    "access_token_issued", "api_call", "api_response"
+  ],
+  "nodes": [
+    { "id": "calendar", "x": 100, "y": 320, "w": 260 },
+    { "id": "idp", "x": 510, "y": 80, "w": 240 },
+    { "id": "zoom", "x": 920, "y": 320, "w": 260 }
+  ],
+  "edges": [
+    { "id": "calendar-to-zoom-connect", "from": "calendar", "to": "zoom", "label": "Connect / Access Zoom", "colorKey": "auth", "visibleOn": ["calendar_to_zoom"] },
+    { "id": "zoom-to-idp-sso", "from": "zoom", "to": "idp", "label": "SSO (OIDC)", "colorKey": "consent", "pulseOn": "zoom_sso_request", "visibleOn": ["zoom_sso_request"] },
+    { "id": "idp-to-zoom-id-token", "from": "idp", "to": "zoom", "label": "ID Token", "colorKey": "idToken", "visibleOn": ["id_token_received"] },
+    { "id": "calendar-to-zoom-scope-request", "from": "calendar", "to": "zoom", "label": "Request Scopes (meeting.read, meeting.write)", "colorKey": "token", "visibleOn": ["scope_request"] },
+    { "id": "zoom-to-calendar-access-token", "from": "zoom", "to": "calendar", "label": "Access Token (Zoom)", "colorKey": "success", "visibleOn": ["access_token_issued"] },
+    { "id": "calendar-to-zoom-api-request", "from": "calendar", "to": "zoom", "label": "POST /meetings (Bearer ...)", "colorKey": "api", "visibleOn": ["api_call"] },
+    { "id": "zoom-to-calendar-api-response", "from": "zoom", "to": "calendar", "label": "Meeting Created (200 OK)", "colorKey": "successBright", "visibleOn": ["api_response"] }
+  ],
+  "scopes": [
+    { "key": "meeting.read", "description": "Read meeting details" },
+    { "key": "meeting.write", "description": "Schedule & update meetings" }
+  ],
+  "insights": [
+    {
+      "id": "pros-cons",
+      "stepId": "api_response",
+      "title": "Standard OAuth 2.0 App-to-App",
+      "variant": "mixed",
+      "sections": [
+        {
+          "heading": "What You Gain",
+          "variant": "positive",
+          "items": [
+            "You get scoped access, so Calendar can only read and write meetings, nothing else",
+            "Your user explicitly grants consent, keeping them in the loop on what's shared",
+            "Tokens expire and can be revoked, so access isn't permanent"
+          ]
+        },
+        {
+          "heading": "Where It Falls Short",
+          "variant": "negative",
+          "items": [
+            "Every app pair needs its own separate OAuth setup, which gets tedious at scale",
+            "Your IdP isn't involved when apps issue tokens to each other, creating a blind spot",
+            "Nobody has a centralized dashboard showing all cross-app access in one place"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "title": "Refresh Token Grant",
+  "startLabel": "Start Refresh Flow",
+  "steps": {
+    "idle": null,
+    "initial_auth_complete": {
+      "number": 1,
+      "caption": "Your initial OAuth flow wrapped up successfully. Your app now holds two things: an access_token that expires quickly (roughly an hour) and a refresh_token that sticks around much longer (days to months). That refresh token lives safely on your backend.",
+      "why": "Access tokens are deliberately short-lived so that if one gets stolen, the window of abuse stays narrow — minutes to an hour at most. The refresh token is the long-lived credential that lets your app renew access without making the user log in again.",
+      "risk": "Imagine if you issued only a long-lived access token instead. A single token leak would give an attacker persistent access for days or months. Short access tokens plus a server-side refresh token partition the risk nicely: the access token travels widely but expires fast, while the refresh token is rarely sent and stays stored securely."
+    },
+    "access_token_expires": {
+      "number": 2,
+      "caption": "Your access token just expired. The API fires back a 401 Unauthorized. But instead of dragging the user through another login, your app uses the refresh token to silently get a new access token.",
+      "why": "Forcing users to re-authenticate every 15-60 minutes would be a terrible experience. Silent renewal via refresh tokens keeps sessions alive for days while each individual access token stays short-lived. Best of both worlds.",
+      "risk": "Without refresh tokens, developers tend to reach for dangerous workarounds: dangerously long access-token lifetimes (30+ days) or storing the user's password to re-authenticate silently behind the scenes. Both patterns massively increase the blast radius when a credential leaks."
+    },
+    "app_sends_refresh": {
+      "number": 3,
+      "caption": "Your app sends the refresh_token to the auth server's /token endpoint with grant_type=refresh_token, along with the client_id and client_secret to identify itself. You can even request a narrower scope if you don't need all the original permissions.",
+      "why": "Sending the client_id and client_secret alongside the refresh token proves that the legitimate application is making the request, not some rogue process. Narrowing scope on renewal lets your app follow least privilege by requesting only the permissions it needs right now.",
+      "risk": "If no client authentication were required, anyone who intercepted a refresh token could use it from any machine. Client binding ensures a stolen refresh token is useless without the matching client_secret."
+    },
+    "auth_validates_refresh": {
+      "number": 4,
+      "caption": "The auth server validates your refresh token thoroughly: checks that nobody revoked it, that it hasn't expired, that it belongs to your client, and that the requested scopes fall within the original grant.",
+      "why": "Think of centralized validation as your kill switch. Admins can revoke a specific session, a specific client, or an entire user's sessions instantly. Unlike JWTs validated locally, refresh token checks always hit the auth server, giving you real-time control over who stays logged in.",
+      "risk": "If the auth server skips any validation — say it doesn't check revocation status — a refresh token that should have been invalidated after a password reset will keep issuing new access tokens indefinitely. That one gap defeats your entire revocation strategy."
+    },
+    "new_tokens_issued": {
+      "number": 5,
+      "caption": "The auth server sends back a fresh access_token and optionally a new refresh_token too. When rotation is on, the old refresh_token gets invalidated immediately. If an attacker tries to replay it, the server catches the compromise.",
+      "why": "Refresh token rotation turns what was a reusable bearer credential into a one-time-use token. Each exchange invalidates the old token and issues a new one. A stolen refresh token can only be used once before it collides with the legitimate client's next request, and that collision raises the alarm.",
+      "risk": "Without rotation, a stolen refresh token can be replayed silently forever until it expires, and the real user has no way to detect the theft. With rotation, the first replay — whether by the attacker or the real client — triggers a collision that the auth server detects and responds to by revoking the entire token family."
+    },
+    "app_calls_api": {
+      "number": 6,
+      "caption": "Your app uses the fresh access_token to call the API. The user never had to re-authenticate. Think about it — this is exactly what powers \"stay logged in\" and offline access in the apps you use every day.",
+      "why": "The offline_access scope, required in OIDC for refresh tokens, signals that the user explicitly consented to long-lived access even when they're not actively using your app. Mobile apps syncing in the background, services processing data overnight — that's what this enables.",
+      "risk": "Without explicit offline_access consent, users may not realize that closing their browser doesn't stop background API access. Apps that silently hold refresh tokens without the user's awareness violate informed consent and create invisible long-lived sessions."
+    },
+    "api_responds": {
+      "number": 7,
+      "caption": "The API validates the new token, returns your data, and the session continues seamlessly. Your app repeats this cycle until the refresh token expires or somebody revokes it.",
+      "why": "Seamless renewal means the user perceives one continuous session while behind the scenes, the system continuously limits exposure through short-lived tokens. Here's the core design trade-off of OAuth: user convenience via refresh tokens, security via access-token expiry.",
+      "risk": "If your refresh cycle has no absolute lifetime — no forced re-login after, say, 90 days — a compromised refresh token chain can persist indefinitely. Best practice mandates an absolute session timeout that eventually forces re-authentication regardless of how actively the token is being refreshed."
+    }
+  },
+  "flowSteps": [
+    "idle", "initial_auth_complete", "access_token_expires",
+    "app_sends_refresh", "auth_validates_refresh", "new_tokens_issued",
+    "app_calls_api", "api_responds"
+  ],
+  "nodes": [
+    { "id": "browser", "x": 100, "y": 280, "w": 240 },
+    { "id": "appServer", "x": 510, "y": 280, "w": 240 },
+    { "id": "authServer", "x": 920, "y": 280, "w": 240 }
+  ],
+  "edges": [
+    { "id": "browser-to-app-expired", "from": "browser", "to": "appServer", "label": "API request (expired token)", "colorKey": "error", "visibleOn": ["access_token_expires"] },
+    { "id": "app-to-auth-refresh", "from": "appServer", "to": "authServer", "label": "POST /token (grant_type=refresh_token)", "colorKey": "token", "pulseOn": "app_sends_refresh", "visibleOn": ["app_sends_refresh", "auth_validates_refresh"] },
+    { "id": "auth-to-app-new-tokens", "from": "authServer", "to": "appServer", "label": "New access_token + refresh_token", "colorKey": "success", "pulseOn": "new_tokens_issued", "visibleOn": ["new_tokens_issued"] },
+    { "id": "browser-to-app-retry", "from": "browser", "to": "appServer", "label": "Retry request (new token)", "colorKey": "api", "visibleOn": ["app_calls_api"] },
+    { "id": "app-to-browser-data", "from": "appServer", "to": "browser", "label": "Data (200 OK)", "colorKey": "successBright", "visibleOn": ["api_responds"] }
+  ],
+  "insights": [
+    {
+      "id": "refresh-token-overview",
+      "stepId": "api_responds",
+      "title": "Refresh Token Grant",
+      "variant": "mixed",
+      "description": "Your app can silently renew tokens in the background so users never get interrupted with a login prompt.",
+      "sections": [
+        {
+          "heading": "How Token Rotation Protects You",
+          "variant": "positive",
+          "items": [
+            "Every refresh exchange gives your app a brand-new refresh token",
+            "The old refresh token gets invalidated the instant the new one is issued",
+            "If an attacker replays a used token, the auth server catches the collision and flags the compromise",
+            "When a collision is detected, the server can revoke the entire token family in one shot"
+          ]
+        },
+        {
+          "heading": "Token Lifetimes to Know",
+          "variant": "neutral",
+          "items": [
+            "Access tokens typically last 15 minutes to 1 hour, deliberately kept short-lived",
+            "Refresh tokens last 7 to 90 days depending on your configuration and risk tolerance",
+            "OIDC requires the offline_access scope before it will issue refresh tokens to your app"
+          ]
+        },
+        {
+          "heading": "Rules You Should Follow",
+          "variant": "negative",
+          "items": [
+            "Never store refresh tokens in browser localStorage — that's readable by any script on the page",
+            "Use secure, httpOnly cookies or server-side storage where JavaScript can't touch them",
+            "Always enable token rotation in production so stolen tokens can't be silently replayed",
+            "Set an absolute lifetime that eventually forces re-login, even if the user is actively refreshing"
+          ]
+        }
+      ]
+    }
+  ]
+}

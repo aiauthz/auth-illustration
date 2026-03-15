@@ -1,0 +1,130 @@
+{
+  "title": "Device Authorization Grant (Device Code Flow)",
+  "startLabel": "Start Device Flow",
+  "steps": {
+    "idle": null,
+    "device_requests_code": {
+      "number": 1,
+      "caption": "Your device — maybe a smart TV, maybe a CLI tool — sends a POST to /device/authorize with its client_id and requested scopes. No user interaction happens yet because, well, your device has no browser and probably no keyboard either.",
+      "why": "Input-constrained devices can't open a browser or accept typed URLs. A dedicated device authorization endpoint lets the device kick things off with a simple POST, keeping its responsibilities minimal: request a code, display it, poll for results. That's it.",
+      "risk": "If your device tried to run a full browser-redirect flow like Authorization Code, users would have to type long URLs and passwords on a TV remote. That's not just a UX nightmare — hunt-and-peck password entry on a shared screen exposes credentials to anyone in the room."
+    },
+    "device_receives_code": {
+      "number": 2,
+      "caption": "The auth server responds with four things: a device_code (long and secret), a user_code (short and human-readable, like \"XKCD-1234\"), a verification_uri for the user to visit, and a polling interval, usually 5 seconds.",
+      "why": "Notice how these two codes serve completely different audiences. The device_code is high-entropy (40+ characters) because it acts as the bearer credential your device uses to claim the token later. The user_code is kept short (6-8 characters) because a real person has to type it on a separate device.",
+      "risk": "Low-entropy device_codes would let an attacker brute-force codes to intercept tokens meant for other devices. On the flip side, a long or complex user_code would cause users to mistype it, abandon the flow, or call support — defeating the entire point of a frictionless device experience."
+    },
+    "device_shows_code": {
+      "number": 3,
+      "caption": "Your device puts the user_code and verification URL up on screen. Something like: \"Go to https://auth.example.com/device and enter code: WDJB-MJHT\". Now the user grabs their phone or laptop to continue.",
+      "why": "The user_code needs to be short, unambiguous, and easy to read aloud. Formats like \"WDJB-MJHT\" use a limited character set that avoids confusing pairs like 0/O or 1/l, with hyphens for visual grouping. Think about what's happening physically: the code has to cross a gap from TV screen to phone keyboard.",
+      "risk": "A long or confusing user_code leads to repeated mistyping and frustrated users. And if the auth server doesn't rate-limit user_code entry attempts, an attacker on the same network could brute-force the limited code space — typically just 6-8 alphanumeric characters — and authorize their own session instead of yours."
+    },
+    "user_visits_url": {
+      "number": 4,
+      "caption": "The user opens the verification URL on their phone or laptop browser and authenticates with the authorization server. Username/password, SSO, MFA — whatever methods the server supports all work here.",
+      "why": "Here's the clever part: authentication happens on a device the user already trusts, where password managers, biometrics, and MFA all work perfectly. Your smart TV gets the security properties of a full browser-based login without needing a browser on the TV itself.",
+      "risk": "If the verification URL is served over HTTP instead of HTTPS, or if the user lands on a phishing URL that looks similar, an attacker can harvest both the user_code and the user's credentials in one shot. The auth server must enforce HTTPS and present clear branding so users can verify they're in the right place."
+    },
+    "user_enters_code": {
+      "number": 5,
+      "caption": "The user types in the short user_code that's displayed on the device. The auth server matches it to the device_code behind the scenes and now knows exactly which device is requesting access.",
+      "why": "The user_code is the bridge between two completely isolated channels: the device (which knows the device_code) and the user's browser (which proves identity). Entering the code is the user's explicit confirmation that they intend to authorize THIS specific device, which prevents session fixation across devices.",
+      "risk": "Without requiring code entry — say the flow just used a URL with an embedded token — an attacker could send the verification URL to a victim via phishing. The victim would authenticate and unknowingly authorize the attacker's device. Manual code entry forces physical proximity between the user and the device."
+    },
+    "user_grants_consent": {
+      "number": 6,
+      "caption": "The auth server shows a consent screen: \"Allow CLI Tool to access your repositories?\" The user approves. At this point the device_code is authorized, but the device doesn't know that yet — it's still polling.",
+      "why": "The consent screen is the user's last chance to review what they're authorizing and for which application. On a smart TV there's no way to show a rich consent UI, but on the user's phone, the auth server can display full scope descriptions, app identity, and trust signals.",
+      "risk": "Without a consent screen, any device that displays a legitimate user_code could trick a user into granting access to scopes they never intended. A CLI tool requesting \"repo delete\" access looks exactly the same as one requesting \"repo read\" unless the consent screen clearly spells out the difference."
+    },
+    "device_polls_pending": {
+      "number": 7,
+      "caption": "Meanwhile, your device has been polling POST /token every 5 seconds with the device_code. The auth server keeps responding with error: \"authorization_pending\" because the user hasn't approved yet. Patience.",
+      "why": "The polling interval, returned by the server in the initial response, prevents devices from hammering the token endpoint. The auth server controls the cadence: poll too fast and the device gets a \"slow_down\" response that adds 5 seconds. Server-controlled backoff is critical when millions of devices might be in-flight simultaneously.",
+      "risk": "Without a mandated polling interval, a misbehaving or malicious device could fire thousands of requests per second, creating a denial-of-service condition on the token endpoint. Generic rate limiting isn't enough here — the server needs per-device_code throttling, which the interval mechanism provides."
+    },
+    "device_polls_success": {
+      "number": 8,
+      "caption": "Once the user grants consent, the next poll succeeds. The auth server returns an access_token and optionally a refresh_token. The device_code is consumed and can never be reused.",
+      "why": "The device_code is strictly single-use to prevent replay attacks. Once it's been exchanged for tokens, any subsequent attempt to use it gets rejected. Even if someone intercepted the device_code during the polling phase, they can't redeem it again.",
+      "risk": "If the device_code could be reused, an attacker who intercepted it via network sniffing during polling could wait for the user to authorize, then redeem the same code to get their own copy of the tokens. Single-use consumption closes that race-condition window."
+    },
+    "device_authenticated": {
+      "number": 9,
+      "caption": "Your device is now authenticated and can call APIs. The user's phone acted as the bridge — they never typed a password on the device itself. You've seen this pattern before: GitHub CLI, Netflix, smart TVs all work exactly this way.",
+      "why": "The user never typed a password on the constrained device, meaning credentials were never exposed to a potentially insecure input method like a TV remote or game controller. Your device only ever possessed transient, scoped tokens — never the user's long-term credentials.",
+      "risk": "If the device stored the user's password instead — like pre-OAuth smart TVs used to — a compromised firmware update or a factory reset failure could leak credentials. Token-based access means a compromised device can only abuse its existing tokens, which can be revoked remotely without changing the user's password."
+    }
+  },
+  "flowSteps": [
+    "idle", "device_requests_code", "device_receives_code", "device_shows_code",
+    "user_visits_url", "user_enters_code", "user_grants_consent",
+    "device_polls_pending", "device_polls_success", "device_authenticated"
+  ],
+  "nodes": [
+    { "id": "appServer", "x": 64, "y": 280, "w": 240 },
+    { "id": "authServer", "x": 510, "y": 160, "w": 260 },
+    { "id": "user", "x": 920, "y": 280, "w": 220 }
+  ],
+  "edges": [
+    { "id": "device-to-auth-code-request", "from": "appServer", "to": "authServer", "label": "POST /device/authorize", "colorKey": "auth", "pulseOn": "device_requests_code", "visibleOn": ["device_requests_code"] },
+    { "id": "auth-to-device-codes", "from": "authServer", "to": "appServer", "label": "device_code + user_code", "colorKey": "consent", "visibleOn": ["device_receives_code"] },
+    { "id": "device-shows-to-user", "from": "appServer", "to": "user", "label": "\"Enter code: WDJB-MJHT\"", "colorKey": "authBright", "visibleOn": ["device_shows_code"] },
+    { "id": "user-to-auth-visit", "from": "user", "to": "authServer", "label": "Visit URL + Enter Code", "colorKey": "token", "pulseOn": "user_visits_url", "visibleOn": ["user_visits_url", "user_enters_code", "user_grants_consent"] },
+    { "id": "device-to-auth-poll", "from": "appServer", "to": "authServer", "label": "POST /token (polling)", "colorKey": "error", "dashed": true, "visibleOn": ["device_polls_pending"] },
+    { "id": "device-to-auth-poll-success", "from": "appServer", "to": "authServer", "label": "POST /token (final poll)", "colorKey": "success", "alwaysPulse": true, "visibleOn": ["device_polls_success"] },
+    { "id": "auth-to-device-token", "from": "authServer", "to": "appServer", "label": "Access Token", "colorKey": "successBright", "visibleOn": ["device_authenticated"] }
+  ],
+  "validation": {
+    "step": "user_grants_consent",
+    "nodeId": "authServer",
+    "validatingText": "User granting consent...",
+    "validatedText": "Consent granted",
+    "validatingSubtext": "Waiting for user approval",
+    "validatedSubtext": "Device code authorized"
+  },
+  "insights": [
+    {
+      "id": "device-flow-overview",
+      "stepId": "device_authenticated",
+      "title": "Device Authorization Grant (RFC 8628)",
+      "variant": "positive",
+      "description": "Built specifically for devices that can't open a browser or don't have a proper keyboard for input.",
+      "sections": [
+        {
+          "heading": "Where You've Seen This in the Wild",
+          "variant": "positive",
+          "items": [
+            "GitHub CLI uses it when you run gh auth login and get a code to enter in your browser",
+            "Netflix and YouTube on smart TVs show you a code and a URL on screen",
+            "Azure CLI supports it with az login --use-device-code for headless environments",
+            "Printers and IoT devices use it during initial setup when they have no screen or keyboard to speak of"
+          ]
+        },
+        {
+          "heading": "Understanding the Polling Cycle",
+          "variant": "neutral",
+          "items": [
+            "Your device polls every N seconds, with the interval dictated by the auth server's initial response",
+            "An \"authorization_pending\" response means keep polling — the user hasn't approved yet",
+            "A \"slow_down\" response means back off and add 5 seconds to your polling interval",
+            "An \"expired_token\" response means the device_code timed out and you need to start over from scratch",
+            "A 200 OK means the user authorized and your tokens are in the response body"
+          ]
+        },
+        {
+          "heading": "Security Properties",
+          "variant": "neutral",
+          "items": [
+            "The user_code has enough entropy to prevent guessing within its short validity window",
+            "Device codes expire after a limited time, typically around 15 minutes",
+            "Rate limiting on the polling endpoint prevents brute-force attempts by misbehaving devices",
+            "The user authenticates on their own trusted device, so credentials never touch the constrained device"
+          ]
+        }
+      ]
+    }
+  ]
+}

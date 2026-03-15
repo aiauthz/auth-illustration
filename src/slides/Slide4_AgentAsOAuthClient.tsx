@@ -8,6 +8,7 @@ import { edgeColors } from '@/lib/colors'
 import { InsightsPanel, type InsightEntry } from '@/components/InsightsPanel'
 import { Terminal, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import slideData from '@/data/slide4-agent-oauth-client.json'
 
 type FlowStep =
   | 'idle'
@@ -24,58 +25,7 @@ type FlowStep =
   | 'agent_calls_api'
   | 'zoom_responds'
 
-// Step metadata for captions and sequence numbers
-const stepMetadata: Record<FlowStep, { number: number; caption: string } | null> = {
-  idle: null,
-  user_sso: {
-    number: 1,
-    caption: 'AI Agent initiates SSO - The AI Agent sends SSO request to Okta (IdP) on behalf of the user to establish identity',
-  },
-  idp_validates: {
-    number: 2,
-    caption: 'IDP validates user identity - Okta verifies the user credentials and validates their identity',
-  },
-  idp_returns_id_token: {
-    number: 3,
-    caption: 'Okta issues ID Token to Agent - The Identity Provider returns an ID token to the AI Agent, proving the user\'s identity',
-  },
-  agent_requests_zoom: {
-    number: 4,
-    caption: 'Agent requests Zoom resources - AI Agent (with ID token) requests access to user\'s Zoom meeting recordings',
-  },
-  zoom_redirects_to_idp: {
-    number: 5,
-    caption: 'Zoom redirects to IDP - Zoom redirects to Okta (IdP) to verify user identity via OIDC',
-  },
-  idp_validates_identity: {
-    number: 6,
-    caption: 'IDP validates identity - Okta verifies the user identity to confirm the user is valid',
-  },
-  idp_returns_id_token_to_zoom: {
-    number: 7,
-    caption: 'Okta returns ID Token to Zoom - The Identity Provider returns an ID token to Zoom API, confirming user identity',
-  },
-  agent_requests_scopes: {
-    number: 8,
-    caption: 'Agent requests scopes - AI Agent requests specific permissions (read, write) from Zoom API',
-  },
-  consent_shown: {
-    number: 9,
-    caption: 'User grants consent - After scope request, user approves AI Agent to access Zoom API with requested permissions (read, write)',
-  },
-  zoom_issues_access_token: {
-    number: 10,
-    caption: 'Zoom issues Access Token - Zoom authorization server directly issues access token to AI Agent after user consent (IDP not involved in token issuance)',
-  },
-  agent_calls_api: {
-    number: 11,
-    caption: 'Agent calls Zoom API - The AI Agent uses the access token received from Zoom to fetch meeting recordings',
-  },
-  zoom_responds: {
-    number: 12,
-    caption: 'Zoom returns data - Zoom API validates the access token and returns the requested meeting recordings to the agent',
-  },
-}
+const stepMetadata = slideData.steps as Record<FlowStep, { number: number; caption: string; why?: string; risk?: string } | null>
 
 /**
  * Slide 4: AI Agent as a Registered OAuth Client (The Solution)
@@ -88,21 +38,7 @@ const [isValidated, setIsValidated] = useState(false)
   const [showConsentDialog, setShowConsentDialog] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
 
-  const FLOW_STEPS: FlowStep[] = [
-    'idle',
-    'user_sso',
-    'idp_validates',
-    'idp_returns_id_token',
-    'agent_requests_zoom',
-    'zoom_redirects_to_idp',
-    'idp_validates_identity',
-    'idp_returns_id_token_to_zoom',
-    'agent_requests_scopes',
-    'consent_shown',
-    'zoom_issues_access_token',
-    'agent_calls_api',
-    'zoom_responds',
-  ]
+  const FLOW_STEPS = slideData.flowSteps as FlowStep[]
   const stepIndex = FLOW_STEPS.indexOf(flowStep)
   const reached = (step: FlowStep) => stepIndex >= FLOW_STEPS.indexOf(step)
 
@@ -115,8 +51,8 @@ const [isValidated, setIsValidated] = useState(false)
         stepId: 'user_sso',
         label: '/authorize',
         method: 'GET',
-        url: 'https://okta.example.com/authorize',
-        headers: [{ name: 'Host', value: 'okta.example.com' }],
+        url: 'https://idp.example.com/authorize',
+        headers: [{ name: 'Host', value: 'idp.example.com' }],
         queryParams: {
           response_type: 'code',
           client_id: 'ai-agent-client-id',
@@ -129,7 +65,7 @@ const [isValidated, setIsValidated] = useState(false)
         response: {
           status: 302,
           statusText: 'Found',
-          headers: [{ name: 'Location', value: 'https://okta.example.com/login?...' }],
+          headers: [{ name: 'Location', value: 'https://idp.example.com/login?...' }],
           body: null,
         },
         color: edgeColors.auth,
@@ -138,14 +74,14 @@ const [isValidated, setIsValidated] = useState(false)
 
     if (reached('idp_returns_id_token')) {
       entries.push({
-        id: 'okta-id-token',
+        id: 'idp-id-token',
         stepId: 'idp_returns_id_token',
         label: '/oauth/token',
         method: 'POST',
-        url: 'https://okta.example.com/oauth/token',
+        url: 'https://idp.example.com/oauth/token',
         headers: [
           { name: 'Content-Type', value: 'application/x-www-form-urlencoded' },
-          { name: 'Host', value: 'okta.example.com' },
+          { name: 'Host', value: 'idp.example.com' },
         ],
         body: {
           grant_type: 'authorization_code',
@@ -191,7 +127,7 @@ const [isValidated, setIsValidated] = useState(false)
         response: {
           status: 302,
           statusText: 'Found',
-          headers: [{ name: 'Location', value: 'https://okta.example.com/authorize?...' }],
+          headers: [{ name: 'Location', value: 'https://idp.example.com/authorize?...' }],
           body: null,
         },
         color: edgeColors.consent,
@@ -200,12 +136,12 @@ const [isValidated, setIsValidated] = useState(false)
 
     if (reached('zoom_redirects_to_idp')) {
       entries.push({
-        id: 'zoom-to-okta',
+        id: 'zoom-to-idp',
         stepId: 'zoom_redirects_to_idp',
         label: '/authorize',
         method: 'GET',
-        url: 'https://okta.example.com/authorize',
-        headers: [{ name: 'Host', value: 'okta.example.com' }],
+        url: 'https://idp.example.com/authorize',
+        headers: [{ name: 'Host', value: 'idp.example.com' }],
         queryParams: {
           response_type: 'code',
           client_id: 'zoom-client-id',
@@ -322,105 +258,14 @@ const [isValidated, setIsValidated] = useState(false)
   }, [flowStep])
 
   // Four actors in a specific layout matching the diagram
-  const nodes = [
-    { id: 'user', x: 64, y: 180, w: 200 },
-    { id: 'okta', x: 480, y: 180, w: 240 },
-    { id: 'agent', x: 64, y: 420, w: 200 },
-    { id: 'zoom', x: 920, y: 420, w: 240 },
-  ]
+  const nodes = slideData.nodes
 
-  const edges = [
-    {
-      id: 'user-to-agent-delegation',
-      from: 'agent',
-      to: 'user',
-      label: 'Works on behalf of User',
-      color: edgeColors.authBright,
-      pulse: false,
-      visible: true,
-    },
-    {
-      id: 'agent-to-idp-sso',
-      from: 'agent',
-      to: 'okta',
-      label: 'SSO (OIDC)',
-      color: edgeColors.auth,
-      pulse: flowStep === 'user_sso',
-      visible: flowStep === 'user_sso',
-    },
-    {
-      id: 'idp-to-agent-id-token',
-      from: 'okta',
-      to: 'agent',
-      label: 'id_token',
-      color: edgeColors.token,
-      pulse: flowStep === 'idp_returns_id_token',
-      visible: flowStep === 'idp_returns_id_token',
-    },
-    {
-      id: 'agent-to-zoom-request',
-      from: 'agent',
-      to: 'zoom',
-      label: 'Request Zoom Resources',
-      color: edgeColors.consent,
-      pulse: flowStep === 'agent_requests_zoom',
-      visible: flowStep === 'agent_requests_zoom',
-    },
-    {
-      id: 'zoom-to-idp-verify',
-      from: 'zoom',
-      to: 'okta',
-      label: 'SSO (OIDC)',
-      color: edgeColors.success,
-      pulse: flowStep === 'zoom_redirects_to_idp',
-      visible: flowStep === 'zoom_redirects_to_idp',
-    },
-    {
-      id: 'idp-to-zoom-id-token',
-      from: 'okta',
-      to: 'zoom',
-      label: 'id_token',
-      color: edgeColors.idToken,
-      pulse: flowStep === 'idp_returns_id_token_to_zoom',
-      visible: flowStep === 'idp_returns_id_token_to_zoom',
-    },
-    {
-      id: 'agent-to-zoom-scopes',
-      from: 'agent',
-      to: 'zoom',
-      label: 'Request Scopes (read, write)',
-      color: edgeColors.tokenAlt,
-      pulse: flowStep === 'agent_requests_scopes',
-      visible: flowStep === 'agent_requests_scopes',
-    },
-    {
-      id: 'zoom-to-agent-token',
-      from: 'zoom',
-      to: 'agent',
-      label: 'access_token',
-      color: edgeColors.error,
-      pulse: flowStep === 'zoom_issues_access_token',
-      visible: flowStep === 'zoom_issues_access_token',
-    },
-    {
-      id: 'agent-to-zoom-api',
-      from: 'agent',
-      to: 'zoom',
-      label: 'API Call using access_token',
-      color: edgeColors.api,
-      pulse: flowStep === 'agent_calls_api',
-      visible: flowStep === 'agent_calls_api',
-    },
-    {
-      id: 'zoom-to-agent-response',
-      from: 'zoom',
-      to: 'agent',
-      label: 'Response',
-      color: edgeColors.idToken,
-      pulse: flowStep === 'zoom_responds',
-      visible: flowStep === 'zoom_responds',
-    },
-  ]
+  const edges = slideData.edges.map((e) => ({
+    ...e,
+    color: edgeColors[e.colorKey as keyof typeof edgeColors],
+    pulse: e.alwaysVisible ? false : e.pulseOn === flowStep,
+    visible: e.alwaysVisible ? true : (e.visibleOn ?? []).includes(flowStep),
+  }))
 
   const handleStartFlow = () => {
     setIsValidated(false)
@@ -534,10 +379,7 @@ const [isValidated, setIsValidated] = useState(false)
     setShowConsentDialog(false)
   }
 
-  const scopes = [
-    { key: 'meetings.read', description: 'Read meeting recordings' },
-    { key: 'meetings.write', description: 'Create & update meetings' },
-  ]
+  const scopes = slideData.scopes
 
   const canGoNext =
     flowStep !== 'idle' &&
@@ -549,36 +391,7 @@ const [isValidated, setIsValidated] = useState(false)
   const canGoPrevious =
     flowStep !== 'idle'
 
-  const insightEntries: InsightEntry[] = [
-    {
-      id: 'core-problem',
-      stepId: 'zoom_responds',
-      title: 'Core Problem: IdP Has No Visibility',
-      variant: 'mixed',
-      description:
-        'Zoom issues the access token directly to the AI Agent. Okta (IdP) has no visibility into this transaction.',
-      sections: [
-        {
-          heading: 'What works',
-          variant: 'positive',
-          items: [
-            '• Agent is a registered OAuth client',
-            '• Scoped access with user consent',
-            '• Revocable tokens',
-          ],
-        },
-        {
-          heading: "What's missing",
-          variant: 'negative',
-          items: [
-            '• IdP unaware of token exchange',
-            '• No centralized admin visibility',
-            '• No IdP policy enforcement',
-          ],
-        },
-      ],
-    },
-  ]
+  const insightEntries = slideData.insights as InsightEntry[]
 
   // Auto-validate after showing validation spinner
   useEffect(() => {
@@ -607,7 +420,7 @@ const [isValidated, setIsValidated] = useState(false)
 
   return (
     <SlideLayout
-      title="Approach: AI Agent as a Registered OAuth Client"
+      title={slideData.title}
       flowStep={flowStep}
       stepMetadata={stepMetadata}
       onStart={handleStartFlow}
@@ -620,9 +433,9 @@ const [isValidated, setIsValidated] = useState(false)
       {/* Full-screen Stage */}
       <div className="w-full h-full">
         <Stage nodes={nodes} edges={edges} className="w-full h-full">
-          {/* IDP Validation Indicator - positioned above Okta node */}
+          {/* IDP Validation Indicator - positioned above IdP node */}
           {(flowStep === 'idp_validates' || flowStep === 'idp_validates_identity') && (
-            <ValidationIndicatorPositioned isValidated={isValidated} nodeId="okta" position="top" />
+            <ValidationIndicatorPositioned isValidated={isValidated} nodeId="idp" position="top" />
           )}
 
           {/* Consent Dialog */}

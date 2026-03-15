@@ -9,6 +9,10 @@ export default {
   ],
   prefix: "",
   theme: {
+    fontFamily: {
+      sans: ['"Inter Variable"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+      mono: ['"JetBrains Mono Variable"', '"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+    },
     container: {
       center: true,
       padding: "2rem",

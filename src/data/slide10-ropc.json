@@ -1,0 +1,119 @@
+{
+  "title": "Resource Owner Password Credentials (DEPRECATED)",
+  "startLabel": "Start ROPC Flow",
+  "steps": {
+    "idle": null,
+    "app_asks_password": {
+      "number": 1,
+      "caption": "The application puts up its own login form and asks the user to type their username and password directly into the app. Stop and think about that. The app sees the raw credentials. That's the fundamental problem right there.",
+      "why": "The entire purpose of OAuth is to delegate authentication to a trusted authorization server so that third-party apps never see user passwords. ROPC flips that on its head by handing the password straight to the app, defeating the core principle OAuth was invented to enforce.",
+      "risk": "Once you train users to type their password into any app that shows a login form, they can't tell a legitimate app from a phishing clone. Attackers build pixel-perfect replicas of login screens, and users who are accustomed to ROPC will type their password without a second thought."
+    },
+    "user_enters_credentials": {
+      "number": 2,
+      "caption": "The user types their password into a third-party application. Let that sink in. The app now has the user's actual credentials. In a proper OAuth flow, the user would only ever enter credentials at the authorization server.",
+      "why": "In a proper Authorization Code flow, the user enters credentials at the auth server's domain, visible in the browser address bar. They can verify the URL, see the TLS certificate, and their password manager's domain-matching autofill works correctly. ROPC strips away every one of those trust signals.",
+      "risk": "Your app now possesses the user's plaintext password. Even if the app is well-intentioned, it has to transmit that password over the network and might log it, cache it, or accidentally include it in crash reports. A breach of your app's infrastructure exposes every user's password, not just their OAuth tokens."
+    },
+    "app_sends_to_auth": {
+      "number": 3,
+      "caption": "The app sends the raw username and password to the auth server's /token endpoint with grant_type=password. Think about the data flow: credentials travel from app to auth server, meaning the app must handle and transmit secrets it should never have touched.",
+      "why": "The password gets transmitted as a POST parameter, which means it exists in application memory, potentially in request logs, and in any middleware between the app and the auth server. Compare that to Authorization Code flows where the password never leaves the auth server's own domain.",
+      "risk": "Every network hop, proxy, and logging layer between the app and the auth server becomes a potential leak point for the plaintext password. Even with TLS, the password is available in the application's process memory and can be extracted through memory dumps, debug endpoints, or compromised dependencies."
+    },
+    "auth_validates": {
+      "number": 4,
+      "caption": "The auth server validates the credentials. But notice what's missing: no redirect, no browser context. That means MFA, CAPTCHAs, and device trust checks are all impossible. You've just bypassed your entire security stack.",
+      "why": "MFA requires an interactive challenge-response — a push notification, TOTP code, or WebAuthn ceremony — that needs a browser context. ROPC is a single POST request with no round-trips, so there's simply no mechanism to present a second-factor challenge, show a CAPTCHA, or evaluate device trust.",
+      "risk": "Without MFA, a stolen password is a complete compromise. Organizations that mandate MFA for all users cannot enforce it on ROPC endpoints. Here's the thing: even if the main login page requires MFA, an attacker who knows the password can bypass it entirely by hitting the ROPC token endpoint directly. You've created a backdoor."
+    },
+    "tokens_issued": {
+      "number": 5,
+      "caption": "The auth server returns an access_token and refresh_token. From here on, the flow works normally — the app uses tokens, not passwords. But the damage was done back at step 2 when the app saw the password.",
+      "why": "Once tokens are issued, the flow looks identical to any other OAuth grant. That's deceptive: downstream APIs and audit logs see a normal Bearer token and can't determine that the token was obtained by exposing the user's password. The security violation becomes invisible after issuance.",
+      "risk": "Your app may hang onto the password even after receiving tokens — for \"convenience\" re-authentication, for pre-filling forms, or simply due to careless memory management. Since the app proved it can get tokens with the password, there's no technical incentive to discard the credential, and many apps quietly store it."
+    },
+    "app_calls_api": {
+      "number": 6,
+      "caption": "The app uses the access token to call the API. The API has no way to know that the token was obtained via the password grant — it looks exactly like any other valid token.",
+      "why": "Bearer tokens are opaque to the resource server by design. Your API validates the signature and scopes but has no standard claim indicating which grant type produced the token. Security policies that should block ROPC-issued tokens have no signal to act on at the API layer.",
+      "risk": "Your organization may deprecate ROPC at the auth server level but continue accepting tokens that were already issued via ROPC. Without a grant-type indicator in the token (which would be a non-standard extension), you can't retroactively reject these tokens, leaving a window of exposure until they expire."
+    },
+    "security_problems": {
+      "number": 7,
+      "caption": "DEPRECATED: OAuth 2.1 removes ROPC entirely. The password grant trains users to type credentials into any app that asks — which is exactly what phishing attacks exploit. Use Authorization Code + PKCE with a custom-branded login page instead.",
+      "why": "The phishing risk isn't theoretical. ROPC normalizes the exact behavior that every security awareness program tries to stamp out: entering your password into a third-party application. Custom-branded login pages hosted at the authorization server give your users the same visual experience while keeping credentials on the trusted domain.",
+      "risk": "Every ROPC deployment is a phishing training ground. Users learn that typing their corporate password into app login forms is normal behavior, so when an attacker sends a phishing email with a fake login page, the user complies without hesitation. The incremental convenience of ROPC is not worth the systemic erosion of password hygiene across your entire user base."
+    }
+  },
+  "flowSteps": [
+    "idle", "app_asks_password", "user_enters_credentials", "app_sends_to_auth",
+    "auth_validates", "tokens_issued", "app_calls_api", "security_problems"
+  ],
+  "nodes": [
+    { "id": "user", "x": 64, "y": 280, "w": 200 },
+    { "id": "browser", "x": 370, "y": 280, "w": 240 },
+    { "id": "authServer", "x": 700, "y": 280, "w": 260 },
+    { "id": "service", "x": 1050, "y": 280, "w": 200 }
+  ],
+  "edges": [
+    { "id": "app-asks-user", "from": "browser", "to": "user", "label": "\"Enter your password\"", "colorKey": "consent", "visibleOn": ["app_asks_password"] },
+    { "id": "user-enters-creds", "from": "user", "to": "browser", "label": "Username + Password", "colorKey": "error", "pulseOn": "user_enters_credentials", "visibleOn": ["user_enters_credentials"] },
+    { "id": "app-to-auth-password", "from": "browser", "to": "authServer", "label": "POST /token (username + password)", "colorKey": "error", "pulseOn": "app_sends_to_auth", "visibleOn": ["app_sends_to_auth", "auth_validates"] },
+    { "id": "auth-to-app-tokens", "from": "authServer", "to": "browser", "label": "access_token + refresh_token", "colorKey": "success", "visibleOn": ["tokens_issued"] },
+    { "id": "app-to-api", "from": "browser", "to": "service", "label": "GET /api (Bearer ...)", "colorKey": "api", "visibleOn": ["app_calls_api", "security_problems"] }
+  ],
+  "loginDialog": {
+    "title": "Third-Party App Login",
+    "description": "This app is asking for your password directly (NOT the auth server)"
+  },
+  "insights": [
+    {
+      "id": "ropc-problems",
+      "stepId": "security_problems",
+      "title": "Why ROPC Got Removed in OAuth 2.1",
+      "variant": "negative",
+      "description": "The Resource Owner Password Credentials grant defeats the core purpose of OAuth: your user should never share their password with the client application. Full stop.",
+      "sections": [
+        {
+          "heading": "The Core Problem",
+          "variant": "negative",
+          "items": [
+            "Your app sees the user's actual password, which directly violates the foundational principle OAuth was built on",
+            "You're training users to type passwords into third-party apps, which is exactly what phishing attacks rely on",
+            "Your app has to handle, transmit, and potentially store raw credentials it should never have touched",
+            "Users have no guarantee that your app won't misuse, log, or leak their password"
+          ]
+        },
+        {
+          "heading": "What Breaks Technically",
+          "variant": "negative",
+          "items": [
+            "MFA can't work because there's no browser context to present a second-factor challenge",
+            "No consent screen means users can't review or choose which scopes to grant",
+            "Federated identity like SAML or social login can't plug in without a browser redirect",
+            "You lose session management and single sign-on capabilities entirely"
+          ]
+        },
+        {
+          "heading": "The One Scenario People Cite",
+          "variant": "neutral",
+          "items": [
+            "First-party apps migrating from direct authentication to OAuth sometimes use ROPC as a stepping stone",
+            "Even then, treat it as a temporary bridge during migration, never a permanent solution",
+            "Custom login pages combined with Authorization Code + PKCE give you a better migration path"
+          ]
+        },
+        {
+          "heading": "What to Reach For Instead",
+          "variant": "positive",
+          "items": [
+            "Authorization Code + PKCE covers every interactive app scenario, from SPAs to mobile apps",
+            "Host a custom-branded login page at your auth server so the experience feels like your app",
+            "For machine-to-machine scenarios where no user is involved, use Client Credentials"
+          ]
+        }
+      ]
+    }
+  ]
+}

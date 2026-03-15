@@ -1,0 +1,68 @@
+[
+  {
+    "slug": "oauth-consent",
+    "title": "Basic OIDC Authentication",
+    "description": "Start here. You'll see how a user logs in through an identity provider with SSO — everything else builds on top of this.",
+    "category": "Foundations"
+  },
+  {
+    "slug": "pkce",
+    "title": "Authorization Code + PKCE",
+    "description": "The go-to OAuth flow for SPAs and mobile apps. You'll learn how PKCE stops attackers from hijacking authorization codes — and why every public client needs it.",
+    "category": "Foundations"
+  },
+  {
+    "slug": "refresh-token",
+    "title": "Refresh Token Grant",
+    "description": "So your access token expired. Now what? Walk through silent renewal with refresh tokens and see how token rotation catches replay attacks before they do damage.",
+    "category": "Core Flows"
+  },
+  {
+    "slug": "client-credentials",
+    "title": "Client Credentials (M2M)",
+    "description": "The most straightforward OAuth flow you'll encounter — no user involved, just one machine talking to another. Perfect for microservices, cron jobs, and CI/CD pipelines.",
+    "category": "Core Flows"
+  },
+  {
+    "slug": "app-to-app",
+    "title": "App-to-App: Calendar ↔ Zoom",
+    "description": "Ever wonder how two apps share your data without sharing your password? Walk through multi-party OAuth and see delegation in action.",
+    "category": "Core Flows"
+  },
+  {
+    "slug": "device-code",
+    "title": "Device Authorization Grant",
+    "description": "Think about your smart TV or a CLI tool — no keyboard, no browser. You'll see how the device asks you to approve access from your phone while it patiently polls for an answer.",
+    "category": "Core Flows"
+  },
+  {
+    "slug": "implicit-flow",
+    "title": "Implicit Grant (Deprecated)",
+    "description": "The old-school SPA flow that dropped tokens right into the URL fragment. Walk through it to understand exactly why OAuth 2.1 killed it — knowing what went wrong sharpens your security instincts.",
+    "category": "Deprecated"
+  },
+  {
+    "slug": "ropc",
+    "title": "Password Grant (Deprecated)",
+    "description": "Your app gets the user's actual password — which defeats the entire point of OAuth. See how this grant accidentally trains users to fall for phishing.",
+    "category": "Deprecated"
+  },
+  {
+    "slug": "delegated-api-key",
+    "title": "API Key Delegation (The Problem)",
+    "description": "What happens when a user hands their API key to an AI agent? Walk through the security holes that open up and why you'd never want this in production.",
+    "category": "AI Agent Patterns"
+  },
+  {
+    "slug": "agent-as-oauth-client",
+    "title": "Agent as OAuth Client",
+    "description": "A smarter move — the AI agent registers as its own OAuth client. Better than sharing keys, but notice how the identity provider still can't see the full picture.",
+    "category": "AI Agent Patterns"
+  },
+  {
+    "slug": "cross-app-access",
+    "title": "Cross-App Access (ID-JAG)",
+    "description": "Here's where it all comes together. Identity Assertion Authorization Grant gives the identity provider full visibility into who's accessing what across apps.",
+    "category": "AI Agent Patterns"
+  }
+]
