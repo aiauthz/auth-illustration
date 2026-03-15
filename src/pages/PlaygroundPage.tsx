@@ -210,10 +210,13 @@ export function PlaygroundPage() {
     clearFlowState()
   }
 
-  // Build timeline steps from events
+  // Build timeline steps from events — include httpEntry for expandable detail
   const timelineSteps: TimelineStep[] = events.map((event, i) => ({
     id: event.stepId,
     label: event.label,
+    httpEntry: event.httpEntry,
+    redirectUrl: event.redirectUrl,
+    error: event.error,
     status:
       event.type === 'error'
         ? 'error'
