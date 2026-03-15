@@ -21,6 +21,8 @@ export interface StoredFlowState {
   tokenUrl: string
   /** Pre-redirect HTTP log entries (serialized) */
   preRedirectLog: string
+  /** Playground step-builder state snapshot for cross-redirect persistence */
+  playgroundSnapshot?: string
 }
 
 /** Save flow state before redirect */

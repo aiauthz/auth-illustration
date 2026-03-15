@@ -77,21 +77,10 @@ export function PresentationPage() {
     }
   }, [currentSlide, readySlides.length])
 
-  const handleSlideChange = (slide: number) => {
-    if (slide >= 1 && slide <= readySlides.length) {
-      setCurrentSlide(slide)
-    }
-  }
-
   const SlideComponent = readySlides[currentSlide - 1].component!
 
   return (
-    <SlideFrame
-      currentSlide={currentSlide}
-      totalSlides={readySlides.length}
-      slideTitle={readySlides[currentSlide - 1].title}
-      onSlideChange={handleSlideChange}
-    >
+    <SlideFrame>
       <SlideComponent />
     </SlideFrame>
   )

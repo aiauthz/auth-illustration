@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import { Button } from '@/components/ui/button'
-import { Play, RotateCcw, ArrowRight, ArrowLeft, Eye, Brain, ShieldAlert } from 'lucide-react'
+import { Play, RotateCcw, ArrowRight, ArrowLeft, Eye, Brain, ShieldAlert, Maximize, Minimize, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export interface StepMeta {
@@ -66,7 +67,7 @@ const accentColors: Record<string, { text: string; border: string; bg: string; t
 }
 
 export function SlideLayout({
-  title: _title,
+  title,
   flowStep,
   stepMetadata,
   onStart,
@@ -81,6 +82,24 @@ export function SlideLayout({
   const isIdle = flowStep === 'idle'
   const meta = stepMetadata[flowStep] ?? null
   const [depth, setDepth] = useState<CaptionDepth>('what')
+  const navigate = useNavigate()
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen()
+    } else {
+      await document.exitFullscreen()
+    }
+  }
 
   const stepType = meta?.type ?? 'flow'
   const isOverlayStep = stepType === 'title' || stepType === 'text' || stepType === 'summary'
@@ -121,91 +140,129 @@ export function SlideLayout({
   return (
     <div className="flex flex-col w-full h-full">
       {/* Control bar */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-neutral-900/95 border-b border-neutral-800 flex-shrink-0 z-50">
-        <AnimatePresence mode="wait">
-          {isIdle ? (
-            <motion.div
-              key="start"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Button
-                onClick={onStart}
-                size="sm"
-                className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700"
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center px-4 py-2 bg-neutral-900/95 border-b border-neutral-800 flex-shrink-0 z-50">
+        {/* Left: controls */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => navigate('/')}
+            aria-label="Go to home page"
+            className="h-8 w-8 bg-neutral-800 border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+          >
+            <Home className="h-4 w-4" />
+          </Button>
+          <AnimatePresence mode="wait">
+            {isIdle ? (
+              <motion.div
+                key="start"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
               >
-                <Play className="h-4 w-4 mr-1.5" />
-                {startLabel}
-              </Button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="controls"
-              className="flex items-center gap-3"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Button
-                onClick={onPrevious}
-                disabled={!canGoPrevious}
-                size="sm"
-                className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50"
+                <Button
+                  onClick={onStart}
+                  size="sm"
+                  className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700"
+                >
+                  <Play className="h-4 w-4 mr-1.5" />
+                  {startLabel}
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="controls"
+                className="flex items-center gap-3"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
               >
-                <ArrowLeft className="h-4 w-4 mr-1.5" />
-                Previous
-              </Button>
-              <Button
-                onClick={onNext}
-                disabled={!canGoNext}
-                size="sm"
-                className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50"
-              >
-                <ArrowRight className="h-4 w-4 mr-1.5" />
-                Next Step
-              </Button>
-              <Button
-                onClick={onReset}
-                variant="outline"
-                size="sm"
-                className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800"
-              >
-                <RotateCcw className="h-4 w-4 mr-1.5" />
-                Reset
-              </Button>
+                <Button
+                  onClick={onPrevious}
+                  disabled={!canGoPrevious}
+                  size="sm"
+                  className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-1.5" />
+                  Previous
+                </Button>
+                <Button
+                  onClick={onNext}
+                  disabled={!canGoNext}
+                  size="sm"
+                  className="bg-neutral-800 text-neutral-100 hover:bg-neutral-700 disabled:opacity-50"
+                >
+                  <ArrowRight className="h-4 w-4 mr-1.5" />
+                  Next Step
+                </Button>
+                <Button
+                  onClick={onReset}
+                  variant="outline"
+                  size="sm"
+                  className="bg-neutral-900 border-neutral-700 text-neutral-200 hover:bg-neutral-800"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  Reset
+                </Button>
 
-              {hasMultipleDepths && (
-                <div className="flex items-center gap-1 ml-auto border-l border-neutral-700 pl-3">
-                  {DEPTH_ORDER.map((d) => {
-                    const dc = depthConfig[d]
-                    const Icon = dc.icon
-                    const isActive = depth === d
-                    const hasContent = d === 'what' || (d === 'why' && meta?.why) || (d === 'risk' && meta?.risk)
-                    if (!hasContent) return null
-                    return (
-                      <button
-                        key={d}
-                        onClick={() => setDepth(d)}
-                        className={cn(
-                          'flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors',
-                          isActive
-                            ? `${dc.bgColor} ${dc.color} ${dc.borderColor} border`
-                            : 'text-neutral-500 hover:text-neutral-300',
-                        )}
-                      >
-                        <Icon className="h-3 w-3" />
-                        {dc.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </motion.div>
+                {hasMultipleDepths && (
+                  <div className="flex items-center gap-0.5 bg-neutral-800/80 rounded-lg p-0.5 border border-neutral-700/50 ml-3">
+                    {DEPTH_ORDER.map((d) => {
+                      const dc = depthConfig[d]
+                      const Icon = dc.icon
+                      const isActive = depth === d
+                      const hasContent = d === 'what' || (d === 'why' && meta?.why) || (d === 'risk' && meta?.risk)
+                      if (!hasContent) return null
+                      return (
+                        <button
+                          key={d}
+                          onClick={() => setDepth(d)}
+                          className={cn(
+                            'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-200',
+                            isActive
+                              ? `${dc.bgColor} ${dc.color} shadow-sm`
+                              : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-700/50',
+                          )}
+                        >
+                          <Icon className="h-3 w-3" />
+                          {dc.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Center: title */}
+        <div className="flex justify-center pl-6">
+          {title && (
+            <h2 className="text-sm font-semibold text-neutral-100 px-3 py-1 rounded-lg border border-neutral-700 bg-neutral-800/90 whitespace-nowrap">
+              {title}
+            </h2>
           )}
-        </AnimatePresence>
+        </div>
+
+        {/* Right: fullscreen */}
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            className="h-8 w-8 bg-neutral-800 border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+          >
+            {isFullscreen ? (
+              <Minimize className="h-4 w-4" />
+            ) : (
+              <Maximize className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Content area */}

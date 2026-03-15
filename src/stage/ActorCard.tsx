@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Bot, Globe, Shield, User, Server } from 'lucide-react'
+import { Bot, Globe, Shield, User, Server, Tv } from 'lucide-react'
 import { GoogleCalendarLogo } from '@/components/logos/GoogleCalendarLogo'
 import { ZoomLogo } from '@/components/logos/ZoomLogo'
 import { HoverTooltip } from '@/components/HoverTooltip'
@@ -70,6 +70,14 @@ const actorConfig: Record<
     badge: 'SPA',
     description:
       'Single-page application running in the browser. A public client that cannot securely store secrets.',
+  },
+  smartTv: {
+    title: 'Netflix TV App',
+    subtitle: 'Smart TV Device',
+    icon: Tv,
+    badge: 'Device',
+    description:
+      'Input-constrained device like a smart TV that cannot open a browser or accept typed credentials. Uses the Device Code flow to authenticate.',
   },
   appServer: {
     title: 'App Server',

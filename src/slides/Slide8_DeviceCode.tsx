@@ -5,6 +5,7 @@ import { type HttpRequestEntry } from '@/components/HttpRequestPanel'
 import { InsightsPanel, type InsightEntry } from '@/components/InsightsPanel'
 import { HttpTerminalDrawer } from '@/components/HttpTerminalDrawer'
 import { ValidationIndicatorPositioned } from '@/components/ValidationIndicatorPositioned'
+import { DeviceTVScreen, UserPhoneScreen } from '@/components/DeviceFlowScreens'
 import { makeJwt } from '@/lib/tokens'
 import { edgeColors } from '@/lib/colors'
 import slideData from '@/data/slide8-device-code.json'
@@ -39,7 +40,7 @@ export function Slide8_DeviceCode() {
   const [pollCount, setPollCount] = useState(0)
 
   const [accessToken] = useState(() =>
-    makeJwt({ sub: 'user@example.com', scope: 'repo read:user', client_id: 'gh-cli' }),
+    makeJwt({ sub: 'user@netflix.com', scope: 'profile streaming', client_id: 'netflix-smarttv' }),
   )
 
   const stepIndex = FLOW_STEPS.indexOf(flowStep)
@@ -66,11 +67,11 @@ export function Slide8_DeviceCode() {
         stepId: 'device_requests_code',
         label: 'POST /device/authorize',
         method: 'POST',
-        url: 'https://auth.example.com/device/authorize',
+        url: 'https://netflix.com/device/authorize',
         headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }],
         body: {
-          client_id: 'gh-cli-client-id',
-          scope: 'repo read:user user:email',
+          client_id: 'netflix-smarttv-LG-2024',
+          scope: 'profile streaming preferences',
         },
         response: reached('device_receives_code')
           ? {
@@ -80,8 +81,8 @@ export function Slide8_DeviceCode() {
               body: {
                 device_code: 'GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS',
                 user_code: 'WDJB-MJHT',
-                verification_uri: 'https://auth.example.com/device',
-                verification_uri_complete: 'https://auth.example.com/device?user_code=WDJB-MJHT',
+                verification_uri: 'https://netflix.com/activate',
+                verification_uri_complete: 'https://netflix.com/activate?code=WDJB-MJHT',
                 expires_in: '900',
                 interval: '5',
               },
@@ -97,12 +98,12 @@ export function Slide8_DeviceCode() {
         stepId: 'device_polls_pending',
         label: 'POST /token (pending)',
         method: 'POST',
-        url: 'https://auth.example.com/oauth/token',
+        url: 'https://netflix.com/oauth/token',
         headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }],
         body: {
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
           device_code: 'GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS',
-          client_id: 'gh-cli-client-id',
+          client_id: 'netflix-smarttv-LG-2024',
         },
         response: {
           status: 400,
@@ -120,12 +121,12 @@ export function Slide8_DeviceCode() {
         stepId: 'device_polls_success',
         label: 'POST /token (success)',
         method: 'POST',
-        url: 'https://auth.example.com/oauth/token',
+        url: 'https://netflix.com/oauth/token',
         headers: [{ name: 'Content-Type', value: 'application/x-www-form-urlencoded' }],
         body: {
           grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
           device_code: 'GmRhmhcxhwAzkoEqiMEg_DnyEysNkuNhszIySk9eS',
-          client_id: 'gh-cli-client-id',
+          client_id: 'netflix-smarttv-LG-2024',
         },
         response: {
           status: 200,
@@ -138,8 +139,8 @@ export function Slide8_DeviceCode() {
             access_token: accessToken,
             token_type: 'Bearer',
             expires_in: '28800',
-            scope: 'repo read:user user:email',
-            refresh_token: 'rt_ghr_xxxxxxxxxxxx',
+            scope: 'profile streaming preferences',
+            refresh_token: 'rt_nflx_xxxxxxxxxxxx',
           },
         },
         color: edgeColors.success,
@@ -215,6 +216,16 @@ export function Slide8_DeviceCode() {
               validatedSubtext={slideData.validation.validatedSubtext}
             />
           )}
+
+          {/* TV Screen - positioned below the App Server node */}
+          <div className="absolute" style={{ left: '44px', top: '430px' }}>
+            <DeviceTVScreen flowStep={flowStep} pollCount={pollCount} />
+          </div>
+
+          {/* Phone Screen - positioned below the User node */}
+          <div className="absolute" style={{ left: '960px', top: '400px' }}>
+            <UserPhoneScreen flowStep={flowStep} />
+          </div>
         </Stage>
       </div>
 
