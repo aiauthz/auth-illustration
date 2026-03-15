@@ -148,6 +148,81 @@ export async function startAuthCodePkceFlow(config: FlowConfig): Promise<FlowEve
  * Exchanges an authorization code for tokens (PKCE flow).
  * Called after the redirect callback.
  */
+/**
+ * Generic token endpoint POST. Used by all token exchange flows.
+ */
+async function postTokenEndpoint(
+  tokenUrl: string,
+  params: Record<string, string>,
+): Promise<{
+  tokens: Record<string, unknown> | null
+  error?: string
+}> {
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: new URLSearchParams(params).toString(),
+    })
+
+    let responseBody: Record<string, unknown> | null = null
+    try {
+      responseBody = await response.json()
+    } catch {
+      // Response may not be JSON
+    }
+
+    if (!response.ok) {
+      return {
+        tokens: null,
+        error: `Token exchange failed: ${response.status} ${response.statusText}`,
+      }
+    }
+
+    return { tokens: responseBody }
+  } catch (err) {
+    return {
+      tokens: null,
+      error: err instanceof Error ? err.message : 'Token exchange failed',
+    }
+  }
+}
+
+/** Exchange auth code with client_secret (confidential client, no PKCE). */
+export function exchangeCodeWithSecret(
+  tokenUrl: string,
+  code: string,
+  clientId: string,
+  redirectUri: string,
+  clientSecret: string,
+) {
+  return postTokenEndpoint(tokenUrl, {
+    grant_type: 'authorization_code',
+    code,
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    client_secret: clientSecret,
+  })
+}
+
+/** Exchange client credentials for token (M2M flow). */
+export function exchangeClientCredentials(
+  tokenUrl: string,
+  clientId: string,
+  clientSecret: string,
+  scope: string,
+) {
+  return postTokenEndpoint(tokenUrl, {
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope,
+  })
+}
+
 export async function exchangeCodeForTokens(
   tokenUrl: string,
   code: string,

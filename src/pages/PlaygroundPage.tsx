@@ -1,4 +1,4 @@
-import { useState, useReducer, useEffect, useCallback } from 'react'
+import { useState, useReducer, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -15,15 +15,22 @@ import {
   Globe,
   Code2,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
 import { ProviderSelector } from '@/components/playground/ProviderSelector'
+import { FlowSelector } from '@/components/playground/FlowSelector'
 import { JwtDecoder } from '@/components/playground/JwtDecoder'
 import { SecurityWarnings } from '@/components/playground/SecurityWarnings'
 import { SyntaxHighlight, toJsonString } from '@/components/SyntaxHighlight'
 
-import { PROVIDERS, buildOidcUrls, type OAuthProviderConfig } from '@/lib/providers'
+import {
+  PROVIDERS,
+  buildOidcUrls,
+  type OAuthProviderConfig,
+  type OAuthFlowType,
+} from '@/lib/providers'
 import {
   generateCodeVerifier,
   generateCodeChallenge,
@@ -37,54 +44,108 @@ import {
   clearAllPlaygroundData,
   type StoredFlowState,
 } from '@/lib/flowState'
-import { exchangeCodeForTokens } from '@/services/oauthFlow'
+import {
+  exchangeCodeForTokens,
+  exchangeCodeWithSecret,
+  exchangeClientCredentials,
+} from '@/services/oauthFlow'
 import { cn } from '@/lib/utils'
 
-// ─── Types ──────────────────────────────────────────────────────
+// ─── Flow Step Definitions ──────────────────────────────────────
 
-const STEP_TITLES = [
-  'Choose Provider',
-  'Generate PKCE',
-  'Build Authorization URL',
-  'Handle Callback',
-  'Exchange Code for Tokens',
-  'Decode Tokens',
-] as const
+type StepRenderKey = 'setup' | 'security' | 'authUrl' | 'callback' | 'exchange' | 'decode'
 
-const STEP_ICONS = [Globe, Shield, Code2, ExternalLink, Key, Sparkles]
+interface FlowStepDef {
+  title: string
+  icon: typeof Globe
+  render: StepRenderKey
+}
+
+const FLOW_STEPS: Record<OAuthFlowType, FlowStepDef[]> = {
+  authorization_code_pkce: [
+    { title: 'Choose Provider & Flow', icon: Globe, render: 'setup' },
+    { title: 'Generate PKCE', icon: Shield, render: 'security' },
+    { title: 'Build Authorization URL', icon: Code2, render: 'authUrl' },
+    { title: 'Handle Callback', icon: ExternalLink, render: 'callback' },
+    { title: 'Exchange Code for Tokens', icon: Key, render: 'exchange' },
+    { title: 'Decode Tokens', icon: Sparkles, render: 'decode' },
+  ],
+  authorization_code: [
+    { title: 'Choose Provider & Flow', icon: Globe, render: 'setup' },
+    { title: 'Generate State & Nonce', icon: Shield, render: 'security' },
+    { title: 'Build Authorization URL', icon: Code2, render: 'authUrl' },
+    { title: 'Handle Callback', icon: ExternalLink, render: 'callback' },
+    { title: 'Exchange Code for Tokens', icon: Key, render: 'exchange' },
+    { title: 'Decode Tokens', icon: Sparkles, render: 'decode' },
+  ],
+  client_credentials: [
+    { title: 'Choose Provider & Flow', icon: Globe, render: 'setup' },
+    { title: 'Exchange Credentials for Token', icon: Key, render: 'exchange' },
+    { title: 'Decode Tokens', icon: Sparkles, render: 'decode' },
+  ],
+  implicit: [
+    { title: 'Choose Provider & Flow', icon: Globe, render: 'setup' },
+    { title: 'Generate State & Nonce', icon: Shield, render: 'security' },
+    { title: 'Build Authorization URL', icon: Code2, render: 'authUrl' },
+    { title: 'Handle Callback (Fragment)', icon: ExternalLink, render: 'callback' },
+    { title: 'Decode Tokens', icon: Sparkles, render: 'decode' },
+  ],
+}
+
+const FLOW_BADGES: Record<OAuthFlowType, { label: string; className: string }> = {
+  authorization_code_pkce: {
+    label: 'Auth Code + PKCE',
+    className: 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30',
+  },
+  authorization_code: {
+    label: 'Auth Code',
+    className: 'bg-blue-600/20 text-blue-400 border-blue-500/30',
+  },
+  client_credentials: {
+    label: 'Client Credentials',
+    className: 'bg-purple-600/20 text-purple-400 border-purple-500/30',
+  },
+  implicit: {
+    label: 'Implicit (Deprecated)',
+    className: 'bg-amber-600/20 text-amber-400 border-amber-500/30',
+  },
+}
+
+// ─── State Types ────────────────────────────────────────────────
 
 type StepStatus = 'locked' | 'active' | 'complete'
-
-type TextFieldKey = 'clientId' | 'redirectUri' | 'scopes' | 'issuerUrl'
+type TextFieldKey = 'clientId' | 'redirectUri' | 'scopes' | 'issuerUrl' | 'clientSecret'
 
 interface PlaygroundState {
   currentStep: number
   expandedSteps: number[]
+  flowType: OAuthFlowType
 
   // Step 0: Provider config
   providerId: string
   clientId: string
+  clientSecret: string
   redirectUri: string
   scopes: string
   issuerUrl: string
   authorizationUrl: string
   tokenUrl: string
 
-  // Step 1: PKCE
+  // Security params
   codeVerifier: string
   codeChallenge: string
   stateParam: string
   nonce: string
 
-  // Step 3: Callback
+  // Callback
   callbackCode: string
   callbackState: string
 
-  // Step 4: Token exchange
+  // Token exchange
   exchangeLoading: boolean
   tokenResponse: Record<string, unknown> | null
 
-  // Step 5: Tokens
+  // Tokens
   tokens: Record<string, string>
 
   error: string | null
@@ -92,6 +153,7 @@ interface PlaygroundState {
 
 type Action =
   | { type: 'SELECT_PROVIDER'; providerId: string }
+  | { type: 'SELECT_FLOW'; flowType: OAuthFlowType }
   | { type: 'SET_FIELD'; field: TextFieldKey; value: string }
   | { type: 'COMPLETE_SETUP'; authorizationUrl: string; tokenUrl: string }
   | {
@@ -101,6 +163,7 @@ type Action =
       stateParam: string
       nonce: string
     }
+  | { type: 'SET_STATE_NONCE'; stateParam: string; nonce: string }
   | { type: 'ADVANCE_STEP' }
   | { type: 'SET_EXCHANGE_LOADING'; loading: boolean }
   | {
@@ -121,16 +184,19 @@ const callbackUrl =
     : 'http://localhost:5173/playground/callback'
 
 function getInitialState(): PlaygroundState {
+  const p = PROVIDERS[0]
   return {
     currentStep: 0,
     expandedSteps: [0],
-    providerId: PROVIDERS[0].id,
+    flowType: p.supportedFlows[0],
+    providerId: p.id,
     clientId: '',
+    clientSecret: '',
     redirectUri: callbackUrl,
-    scopes: PROVIDERS[0].defaultScopes.join(' '),
+    scopes: p.defaultScopes.join(' '),
     issuerUrl: '',
-    authorizationUrl: PROVIDERS[0].authorizationUrl,
-    tokenUrl: PROVIDERS[0].tokenUrl,
+    authorizationUrl: p.authorizationUrl,
+    tokenUrl: p.tokenUrl,
     codeVerifier: '',
     codeChallenge: '',
     stateParam: '',
@@ -153,13 +219,18 @@ function reducer(state: PlaygroundState, action: Action): PlaygroundState {
       return {
         ...state,
         providerId: provider.id,
+        flowType: provider.supportedFlows[0],
         scopes: provider.defaultScopes.join(' '),
         authorizationUrl: provider.authorizationUrl,
         tokenUrl: provider.tokenUrl,
         issuerUrl: '',
+        clientSecret: '',
         error: null,
       }
     }
+
+    case 'SELECT_FLOW':
+      return { ...state, flowType: action.flowType, clientSecret: '', error: null }
 
     case 'SET_FIELD':
       return { ...state, [action.field]: action.value, error: null }
@@ -183,29 +254,34 @@ function reducer(state: PlaygroundState, action: Action): PlaygroundState {
         nonce: action.nonce,
       }
 
-    case 'ADVANCE_STEP': {
-      if (state.currentStep >= 5) return state
-      const next = state.currentStep + 1
+    case 'SET_STATE_NONCE':
       return {
         ...state,
-        currentStep: next,
-        expandedSteps: [next],
-        error: null,
+        stateParam: action.stateParam,
+        nonce: action.nonce,
       }
+
+    case 'ADVANCE_STEP': {
+      const maxStep = FLOW_STEPS[state.flowType].length - 1
+      if (state.currentStep >= maxStep) return state
+      const next = state.currentStep + 1
+      return { ...state, currentStep: next, expandedSteps: [next], error: null }
     }
 
     case 'SET_EXCHANGE_LOADING':
       return { ...state, exchangeLoading: action.loading, error: null }
 
-    case 'SET_TOKEN_RESPONSE':
+    case 'SET_TOKEN_RESPONSE': {
+      const lastStep = FLOW_STEPS[state.flowType].length - 1
       return {
         ...state,
         tokenResponse: action.response,
         tokens: action.tokens,
         exchangeLoading: false,
-        currentStep: 5,
-        expandedSteps: [5],
+        currentStep: lastStep,
+        expandedSteps: [lastStep],
       }
+    }
 
     case 'TOGGLE_STEP': {
       const isExpanded = state.expandedSteps.includes(action.step)
@@ -241,20 +317,22 @@ function getStepStatus(stepIndex: number, currentStep: number): StepStatus {
 
 function StepCard({
   stepIndex,
+  title,
+  icon: Icon,
   currentStep,
   isExpanded,
   onToggle,
   children,
 }: {
   stepIndex: number
+  title: string
+  icon: typeof Globe
   currentStep: number
   isExpanded: boolean
   onToggle: () => void
   children: React.ReactNode
 }) {
   const status = getStepStatus(stepIndex, currentStep)
-  const Icon = STEP_ICONS[stepIndex]
-  const title = STEP_TITLES[stepIndex]
 
   return (
     <div
@@ -290,14 +368,12 @@ function StepCard({
             stepIndex + 1
           )}
         </div>
-
         <Icon
           className={cn(
             'h-4 w-4 flex-shrink-0',
             status === 'active' ? 'text-emerald-400' : 'text-neutral-500',
           )}
         />
-
         <span
           className={cn(
             'font-medium flex-1',
@@ -306,7 +382,6 @@ function StepCard({
         >
           {title}
         </span>
-
         {status !== 'locked' &&
           (isExpanded ? (
             <ChevronDown className="h-4 w-4 text-neutral-500" />
@@ -314,7 +389,6 @@ function StepCard({
             <ChevronRight className="h-4 w-4 text-neutral-500" />
           ))}
       </button>
-
       {isExpanded && status !== 'locked' && (
         <div className="px-5 pb-5 border-t border-neutral-800/50">{children}</div>
       )}
@@ -349,14 +423,12 @@ function ParamRow({
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
-
   const handleCopy = () => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
   }
-
   return (
     <button
       onClick={handleCopy}
@@ -371,24 +443,67 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
+function WarningBanner({
+  children,
+  variant = 'amber',
+}: {
+  children: React.ReactNode
+  variant?: 'amber' | 'red'
+}) {
+  const colors =
+    variant === 'red'
+      ? 'bg-red-900/20 border-red-800/40 text-red-400'
+      : 'bg-amber-900/20 border-amber-800/40 text-amber-400'
+  return (
+    <div className={cn('p-3 rounded-lg border flex items-start gap-2 text-xs', colors)}>
+      <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+      <div>{children}</div>
+    </div>
+  )
+}
+
 // ─── Main Component ─────────────────────────────────────────────
 
 export function PlaygroundPage() {
   const [searchParams] = useSearchParams()
   const [state, dispatch] = useReducer(reducer, undefined, getInitialState)
+  const confettiFired = useRef(false)
 
   const provider = PROVIDERS.find((p) => p.id === state.providerId) ?? PROVIDERS[0]
+  const steps = FLOW_STEPS[state.flowType]
+  const badge = FLOW_BADGES[state.flowType]
+  const isPkce = state.flowType === 'authorization_code_pkce'
+  const isAuthCode = state.flowType === 'authorization_code'
+  const isClientCreds = state.flowType === 'client_credentials'
+  const isImplicit = state.flowType === 'implicit'
+  const needsSecret = isAuthCode || isClientCreds
+
+  // Confetti on reaching decode step with tokens
+  useEffect(() => {
+    const lastStep = steps.length - 1
+    if (
+      state.currentStep === lastStep &&
+      Object.keys(state.tokens).length > 0 &&
+      !confettiFired.current
+    ) {
+      confettiFired.current = true
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.7 },
+        colors: ['#10b981', '#22c55e', '#6ee7b7', '#059669'],
+      })
+    }
+  }, [state.currentStep, state.tokens, steps.length])
 
   // Resume flow after redirect
   const resumeFlow = useCallback(() => {
     const callbackData = sessionStorage.getItem('oauth_playground_callback')
     if (!callbackData) return
 
-    let code: string, cbState: string
+    let parsed: Record<string, string>
     try {
-      const parsed = JSON.parse(callbackData)
-      code = parsed.code
-      cbState = parsed.state
+      parsed = JSON.parse(callbackData)
     } catch {
       sessionStorage.removeItem('oauth_playground_callback')
       dispatch({ type: 'SET_ERROR', error: 'Invalid callback data in session storage' })
@@ -396,38 +511,84 @@ export function PlaygroundPage() {
     }
     sessionStorage.removeItem('oauth_playground_callback')
 
-    if (!code || !cbState) {
-      dispatch({ type: 'SET_ERROR', error: 'Missing code or state in callback data' })
-      return
-    }
-
     const flowState = restoreFlowState()
     if (!flowState) {
       dispatch({ type: 'SET_ERROR', error: 'No pending flow state found' })
       return
     }
 
-    dispatch({
-      type: 'RESTORE',
-      state: {
-        currentStep: 3,
-        expandedSteps: [3],
-        providerId: flowState.providerId,
-        clientId: flowState.clientId,
-        redirectUri: flowState.redirectUri,
-        scopes: flowState.scopes.join(' '),
-        authorizationUrl: flowState.authorizationUrl,
-        tokenUrl: flowState.tokenUrl,
-        codeVerifier: flowState.codeVerifier ?? '',
-        codeChallenge: flowState.codeChallenge ?? '',
-        stateParam: flowState.state,
-        nonce: flowState.nonce ?? '',
-        callbackCode: code,
-        callbackState: cbState,
-      },
-    })
+    const restoredFlowType = (flowState.flowType as OAuthFlowType) || 'authorization_code_pkce'
+    const restoredSteps = FLOW_STEPS[restoredFlowType]
+    const callbackStepIndex = restoredSteps.findIndex((s) => s.render === 'callback')
 
-    // Clean ?flow=resume from URL
+    if (callbackStepIndex === -1) {
+      dispatch({ type: 'SET_ERROR', error: 'This flow type does not support redirect callbacks' })
+      return
+    }
+
+    if (parsed.flowType === 'implicit') {
+      // Implicit: tokens already in callback data
+      const tokens: Record<string, string> = {}
+      if (parsed.access_token) tokens.access_token = parsed.access_token
+      if (parsed.id_token) tokens.id_token = parsed.id_token
+
+      dispatch({
+        type: 'RESTORE',
+        state: {
+          flowType: restoredFlowType,
+          currentStep: callbackStepIndex,
+          expandedSteps: [callbackStepIndex],
+          providerId: flowState.providerId,
+          clientId: flowState.clientId,
+          redirectUri: flowState.redirectUri,
+          scopes: flowState.scopes.join(' '),
+          authorizationUrl: flowState.authorizationUrl,
+          tokenUrl: flowState.tokenUrl,
+          stateParam: flowState.state,
+          nonce: flowState.nonce ?? '',
+          callbackState: parsed.state || '',
+          tokens,
+        },
+      })
+    } else {
+      // Auth code: extract code and state
+      if (!parsed.code || !parsed.state) {
+        dispatch({ type: 'SET_ERROR', error: 'Missing code or state in callback data' })
+        return
+      }
+
+      let clientSecret = ''
+      if (flowState.playgroundSnapshot) {
+        try {
+          clientSecret = JSON.parse(flowState.playgroundSnapshot).clientSecret ?? ''
+        } catch {
+          // ignore
+        }
+      }
+
+      dispatch({
+        type: 'RESTORE',
+        state: {
+          flowType: restoredFlowType,
+          currentStep: callbackStepIndex,
+          expandedSteps: [callbackStepIndex],
+          providerId: flowState.providerId,
+          clientId: flowState.clientId,
+          clientSecret,
+          redirectUri: flowState.redirectUri,
+          scopes: flowState.scopes.join(' '),
+          authorizationUrl: flowState.authorizationUrl,
+          tokenUrl: flowState.tokenUrl,
+          codeVerifier: flowState.codeVerifier ?? '',
+          codeChallenge: flowState.codeChallenge ?? '',
+          stateParam: flowState.state,
+          nonce: flowState.nonce ?? '',
+          callbackCode: parsed.code,
+          callbackState: parsed.state,
+        },
+      })
+    }
+
     window.history.replaceState({}, '', window.location.pathname)
   }, [])
 
@@ -445,6 +606,11 @@ export function PlaygroundPage() {
       return
     }
 
+    if (needsSecret && !state.clientSecret.trim()) {
+      dispatch({ type: 'SET_ERROR', error: 'Client Secret is required for this flow' })
+      return
+    }
+
     let authUrl = provider.authorizationUrl
     let tokUrl = provider.tokenUrl
 
@@ -458,9 +624,19 @@ export function PlaygroundPage() {
       tokUrl = urls.tokenUrl
     }
 
-    if (!authUrl || !tokUrl) {
-      dispatch({ type: 'SET_ERROR', error: 'Authorization URL and Token URL are required' })
-      return
+    if (isClientCreds) {
+      if (!tokUrl) {
+        dispatch({ type: 'SET_ERROR', error: 'Token URL is required' })
+        return
+      }
+    } else {
+      if (!authUrl || !tokUrl) {
+        dispatch({
+          type: 'SET_ERROR',
+          error: 'Authorization URL and Token URL are required',
+        })
+        return
+      }
     }
 
     dispatch({ type: 'COMPLETE_SETUP', authorizationUrl: authUrl, tokenUrl: tokUrl })
@@ -469,37 +645,45 @@ export function PlaygroundPage() {
   const handleGeneratePkce = async () => {
     const verifier = generateCodeVerifier()
     const challenge = await generateCodeChallenge(verifier)
-    const stateParam = generateState()
-    const nonceVal = generateNonce()
-
     dispatch({
       type: 'SET_PKCE',
       codeVerifier: verifier,
       codeChallenge: challenge,
-      stateParam,
-      nonce: nonceVal,
+      stateParam: generateState(),
+      nonce: generateNonce(),
+    })
+  }
+
+  const handleGenerateStateNonce = () => {
+    dispatch({
+      type: 'SET_STATE_NONCE',
+      stateParam: generateState(),
+      nonce: generateNonce(),
     })
   }
 
   const handleRedirect = () => {
-    const params = new URLSearchParams({
-      response_type: 'code',
+    const responseType = isImplicit ? 'token' : 'code'
+    const params: Record<string, string> = {
+      response_type: responseType,
       client_id: state.clientId,
       redirect_uri: state.redirectUri,
       scope: state.scopes,
       state: state.stateParam,
       nonce: state.nonce,
-      code_challenge: state.codeChallenge,
-      code_challenge_method: 'S256',
       ...(provider.extraAuthParams ?? {}),
-    })
+    }
+    if (isPkce) {
+      params.code_challenge = state.codeChallenge
+      params.code_challenge_method = 'S256'
+    }
 
-    const authUrl = `${state.authorizationUrl}?${params.toString()}`
+    const authUrl = `${state.authorizationUrl}?${new URLSearchParams(params).toString()}`
 
     const flowState: StoredFlowState = {
       flowId: state.stateParam,
       providerId: provider.id,
-      flowType: 'authorization_code_pkce',
+      flowType: state.flowType,
       clientId: state.clientId,
       redirectUri: state.redirectUri,
       scopes: state.scopes.split(' ').filter(Boolean),
@@ -512,17 +696,8 @@ export function PlaygroundPage() {
       tokenUrl: state.tokenUrl,
       preRedirectLog: '[]',
       playgroundSnapshot: JSON.stringify({
-        providerId: state.providerId,
-        clientId: state.clientId,
-        redirectUri: state.redirectUri,
-        scopes: state.scopes,
-        issuerUrl: state.issuerUrl,
-        authorizationUrl: state.authorizationUrl,
-        tokenUrl: state.tokenUrl,
-        codeVerifier: state.codeVerifier,
-        codeChallenge: state.codeChallenge,
-        stateParam: state.stateParam,
-        nonce: state.nonce,
+        flowType: state.flowType,
+        clientSecret: state.clientSecret,
       }),
     }
     saveFlowState(flowState)
@@ -534,45 +709,59 @@ export function PlaygroundPage() {
     dispatch({ type: 'SET_EXCHANGE_LOADING', loading: true })
 
     try {
-      const result = await exchangeCodeForTokens(
-        state.tokenUrl,
-        state.callbackCode,
-        state.clientId,
-        state.redirectUri,
-        state.codeVerifier,
-      )
+      let tokens: Record<string, unknown> | null = null
+      let error: string | undefined
 
-      if (result.error) {
-        dispatch({ type: 'SET_ERROR', error: result.error })
+      if (isPkce) {
+        const r = await exchangeCodeForTokens(
+          state.tokenUrl,
+          state.callbackCode,
+          state.clientId,
+          state.redirectUri,
+          state.codeVerifier,
+        )
+        tokens = r.tokens
+        error = r.error
+      } else if (isAuthCode) {
+        const r = await exchangeCodeWithSecret(
+          state.tokenUrl,
+          state.callbackCode,
+          state.clientId,
+          state.redirectUri,
+          state.clientSecret,
+        )
+        tokens = r.tokens
+        error = r.error
+      } else if (isClientCreds) {
+        const r = await exchangeClientCredentials(
+          state.tokenUrl,
+          state.clientId,
+          state.clientSecret,
+          state.scopes,
+        )
+        tokens = r.tokens
+        error = r.error
+      } else {
+        dispatch({ type: 'SET_ERROR', error: 'Token exchange is not supported for this flow type' })
         return
       }
 
-      if (!result.tokens) {
+      if (error) {
+        dispatch({ type: 'SET_ERROR', error })
+        return
+      }
+      if (!tokens) {
         dispatch({ type: 'SET_ERROR', error: 'No tokens received from provider' })
         return
       }
 
-      const receivedTokens: Record<string, string> = {}
-      if (result.tokens.access_token)
-        receivedTokens.access_token = String(result.tokens.access_token)
-      if (result.tokens.id_token) receivedTokens.id_token = String(result.tokens.id_token)
-      if (result.tokens.refresh_token)
-        receivedTokens.refresh_token = String(result.tokens.refresh_token)
+      const received: Record<string, string> = {}
+      if (tokens.access_token) received.access_token = String(tokens.access_token)
+      if (tokens.id_token) received.id_token = String(tokens.id_token)
+      if (tokens.refresh_token) received.refresh_token = String(tokens.refresh_token)
 
-      dispatch({
-        type: 'SET_TOKEN_RESPONSE',
-        response: result.tokens,
-        tokens: receivedTokens,
-      })
-
+      dispatch({ type: 'SET_TOKEN_RESPONSE', response: tokens, tokens: received })
       clearFlowState()
-
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.7 },
-        colors: ['#10b981', '#22c55e', '#6ee7b7', '#059669'],
-      })
     } catch (err) {
       dispatch({
         type: 'SET_ERROR',
@@ -584,27 +773,45 @@ export function PlaygroundPage() {
   const handleReset = () => {
     clearAllPlaygroundData()
     clearFlowState()
+    confettiFired.current = false
     dispatch({ type: 'RESET' })
   }
 
   // ─── Step Renderers ─────────────────────────────────────────
 
-  const isStep0Active = state.currentStep === 0
+  const isSetupActive = state.currentStep === 0
 
-  const renderStep0 = () => (
+  const renderSetup = () => (
     <form
       className="space-y-4 pt-4"
       onSubmit={(e) => {
         e.preventDefault()
-        if (isStep0Active) handleCompleteStep0()
+        if (isSetupActive) handleCompleteStep0()
       }}
     >
-      <ProviderSelector
-        selectedId={state.providerId}
-        onSelect={(p: OAuthProviderConfig) =>
-          dispatch({ type: 'SELECT_PROVIDER', providerId: p.id })
-        }
-      />
+      <div className={cn(!isSetupActive && 'pointer-events-none opacity-60')}>
+        <ProviderSelector
+          selectedId={state.providerId}
+          onSelect={(p: OAuthProviderConfig) =>
+            dispatch({ type: 'SELECT_PROVIDER', providerId: p.id })
+          }
+        />
+      </div>
+
+      <div className={cn(!isSetupActive && 'pointer-events-none opacity-60')}>
+        <FlowSelector
+          supportedFlows={provider.supportedFlows}
+          selectedFlow={state.flowType}
+          onSelect={(f) => dispatch({ type: 'SELECT_FLOW', flowType: f })}
+        />
+      </div>
+
+      {isImplicit && (
+        <WarningBanner>
+          The implicit flow is deprecated and insecure. Tokens are exposed in the URL fragment and
+          browser history. Use Auth Code + PKCE for new applications.
+        </WarningBanner>
+      )}
 
       {provider.notes && (
         <div className="p-3 rounded-lg bg-neutral-800/40 border border-neutral-700/50">
@@ -654,23 +861,44 @@ export function PlaygroundPage() {
         />
       </div>
 
-      <div>
-        <label className="block text-xs text-neutral-400 mb-1.5">Redirect URI</label>
-        <div className="flex items-center gap-2">
+      {needsSecret && (
+        <div>
+          <label className="block text-xs text-neutral-400 mb-1.5">Client Secret</label>
           <input
-            type="url"
-            value={state.redirectUri}
+            type="password"
+            value={state.clientSecret}
             onChange={(e) =>
-              dispatch({ type: 'SET_FIELD', field: 'redirectUri', value: e.target.value })
+              dispatch({ type: 'SET_FIELD', field: 'clientSecret', value: e.target.value })
             }
-            className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm font-mono text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+            placeholder="Your OAuth client secret"
+            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm font-mono text-neutral-200 placeholder:text-neutral-600 focus:border-emerald-500/50 focus:outline-none"
           />
-          <CopyButton text={state.redirectUri} />
+          <p className="text-[10px] text-amber-500/80 mt-1">
+            For educational purposes only. Never expose client secrets in browser-side code in
+            production.
+          </p>
         </div>
-        <p className="text-[10px] text-neutral-500 mt-1">
-          Add this URI to your OAuth app's allowed redirect URIs
-        </p>
-      </div>
+      )}
+
+      {!isClientCreds && (
+        <div>
+          <label className="block text-xs text-neutral-400 mb-1.5">Redirect URI</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="url"
+              value={state.redirectUri}
+              onChange={(e) =>
+                dispatch({ type: 'SET_FIELD', field: 'redirectUri', value: e.target.value })
+              }
+              className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm font-mono text-neutral-200 focus:border-emerald-500/50 focus:outline-none"
+            />
+            <CopyButton text={state.redirectUri} />
+          </div>
+          <p className="text-[10px] text-neutral-500 mt-1">
+            Add this URI to your OAuth app's allowed redirect URIs
+          </p>
+        </div>
+      )}
 
       <div>
         <label className="block text-xs text-neutral-400 mb-1.5">Scopes</label>
@@ -685,7 +913,7 @@ export function PlaygroundPage() {
         />
       </div>
 
-      {isStep0Active ? (
+      {isSetupActive ? (
         <button
           type="submit"
           className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-colors"
@@ -700,129 +928,148 @@ export function PlaygroundPage() {
     </form>
   )
 
-  const renderStep1 = () => (
-    <div className="space-y-4 pt-4">
-      {!state.codeVerifier ? (
-        <>
+  const renderSecurity = () => {
+    const hasValues = !!state.stateParam
+    const isActive = steps.findIndex((s) => s.render === 'security') === state.currentStep
+
+    if (!hasValues) {
+      return (
+        <div className="space-y-4 pt-4">
           <p className="text-sm text-neutral-400">
-            PKCE (Proof Key for Code Exchange) prevents authorization code interception. Click
-            below to generate a cryptographically random code verifier and its SHA-256 challenge.
+            {isPkce
+              ? 'PKCE (Proof Key for Code Exchange) prevents authorization code interception. Generate a cryptographically random code verifier and its SHA-256 challenge.'
+              : 'Generate cryptographic parameters for CSRF and replay protection.'}
           </p>
           <button
-            onClick={handleGeneratePkce}
+            onClick={isPkce ? handleGeneratePkce : handleGenerateStateNonce}
             className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2"
           >
             <RefreshCw className="h-4 w-4" />
-            Generate PKCE Values
+            {isPkce ? 'Generate PKCE Values' : 'Generate Security Parameters'}
           </button>
-        </>
-      ) : (
-        <>
-          <div className="space-y-3">
-            <div className="bg-neutral-800/50 rounded-lg p-3 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
-                  code_verifier
-                </span>
-                <CopyButton text={state.codeVerifier} />
-              </div>
-              <code className="text-xs font-mono text-orange-400 break-all block">
-                {state.codeVerifier}
-              </code>
-              <p className="text-[10px] text-neutral-600">
-                64 random bytes, base64url-encoded. Kept secret — never sent to the authorization
-                endpoint.
-              </p>
-            </div>
+        </div>
+      )
+    }
 
-            <div className="flex items-center justify-center text-neutral-600 text-xs gap-1">
-              <ChevronDown className="h-3 w-3" /> SHA-256 + base64url
-            </div>
-
-            <div className="bg-neutral-800/50 rounded-lg p-3 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
-                  code_challenge
-                </span>
-                <CopyButton text={state.codeChallenge} />
-              </div>
-              <code className="text-xs font-mono text-purple-400 break-all block">
-                {state.codeChallenge}
-              </code>
-              <p className="text-[10px] text-neutral-600">
-                Sent to the authorization endpoint. The provider verifies it against the verifier
-                during token exchange.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+    return (
+      <div className="space-y-4 pt-4">
+        <div className="space-y-3">
+          {isPkce && (
+            <>
               <div className="bg-neutral-800/50 rounded-lg p-3 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
-                    state
+                    code_verifier
                   </span>
-                  <CopyButton text={state.stateParam} />
+                  <CopyButton text={state.codeVerifier} />
                 </div>
-                <code className="text-[10px] font-mono text-blue-400 break-all block">
-                  {state.stateParam}
+                <code className="text-xs font-mono text-orange-400 break-all block">
+                  {state.codeVerifier}
                 </code>
-                <p className="text-[10px] text-neutral-600">CSRF protection</p>
+                <p className="text-[10px] text-neutral-600">
+                  64 random bytes, base64url-encoded. Kept secret — never sent to the authorization
+                  endpoint.
+                </p>
               </div>
-
+              <div className="flex items-center justify-center text-neutral-600 text-xs gap-1">
+                <ChevronDown className="h-3 w-3" /> SHA-256 + base64url
+              </div>
               <div className="bg-neutral-800/50 rounded-lg p-3 space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
-                    nonce
+                    code_challenge
                   </span>
-                  <CopyButton text={state.nonce} />
+                  <CopyButton text={state.codeChallenge} />
                 </div>
-                <code className="text-[10px] font-mono text-teal-400 break-all block">
-                  {state.nonce}
+                <code className="text-xs font-mono text-purple-400 break-all block">
+                  {state.codeChallenge}
                 </code>
-                <p className="text-[10px] text-neutral-600">Replay protection</p>
+                <p className="text-[10px] text-neutral-600">
+                  Sent to the authorization endpoint. The provider verifies it against the verifier
+                  during token exchange.
+                </p>
               </div>
+            </>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-neutral-800/50 rounded-lg p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                  state
+                </span>
+                <CopyButton text={state.stateParam} />
+              </div>
+              <code className="text-[10px] font-mono text-blue-400 break-all block">
+                {state.stateParam}
+              </code>
+              <p className="text-[10px] text-neutral-600">CSRF protection</p>
+            </div>
+            <div className="bg-neutral-800/50 rounded-lg p-3 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                  nonce
+                </span>
+                <CopyButton text={state.nonce} />
+              </div>
+              <code className="text-[10px] font-mono text-teal-400 break-all block">
+                {state.nonce}
+              </code>
+              <p className="text-[10px] text-neutral-600">Replay protection</p>
             </div>
           </div>
+        </div>
 
-          {state.currentStep === 1 && (
-            <div className="flex gap-3">
-              <button
-                onClick={handleGeneratePkce}
-                className="flex-1 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm transition-colors flex items-center justify-center gap-2"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Regenerate
-              </button>
-              <button
-                onClick={() => dispatch({ type: 'ADVANCE_STEP' })}
-                className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-colors"
-              >
-                Continue
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
+        {isActive && (
+          <div className="flex gap-3">
+            <button
+              onClick={isPkce ? handleGeneratePkce : handleGenerateStateNonce}
+              className="flex-1 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm transition-colors flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Regenerate
+            </button>
+            <button
+              onClick={() => dispatch({ type: 'ADVANCE_STEP' })}
+              className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
-  const renderStep2 = () => {
+  const renderAuthUrl = () => {
+    const responseType = isImplicit ? 'token' : 'code'
     const authParams: Record<string, string> = {
-      response_type: 'code',
+      response_type: responseType,
       client_id: state.clientId,
       redirect_uri: state.redirectUri,
       scope: state.scopes,
       state: state.stateParam,
       nonce: state.nonce,
-      code_challenge: state.codeChallenge,
-      code_challenge_method: 'S256',
       ...(provider.extraAuthParams ?? {}),
+    }
+    if (isPkce) {
+      authParams.code_challenge = state.codeChallenge
+      authParams.code_challenge_method = 'S256'
     }
 
     const fullUrl = `${state.authorizationUrl}?${new URLSearchParams(authParams).toString()}`
+    const isActive =
+      steps.findIndex((s) => s.render === 'authUrl') === state.currentStep
 
     return (
       <div className="space-y-4 pt-4">
+        {isImplicit && (
+          <WarningBanner>
+            The implicit flow returns tokens directly in the URL fragment. They will be visible in
+            your browser history and to any JavaScript on the page.
+          </WarningBanner>
+        )}
+
         <div className="bg-neutral-800/50 rounded-lg p-3">
           <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-2">
             Authorization Endpoint
@@ -839,8 +1086,12 @@ export function PlaygroundPage() {
           <div className="divide-y divide-neutral-800/50">
             <ParamRow
               label="response_type"
-              value="code"
-              description="Requesting an authorization code"
+              value={responseType}
+              description={
+                isImplicit
+                  ? 'Requesting tokens directly (no authorization code)'
+                  : 'Requesting an authorization code'
+              }
             />
             <ParamRow label="client_id" value={state.clientId} source="Step 1" />
             <ParamRow label="redirect_uri" value={state.redirectUri} source="Step 1" />
@@ -857,13 +1108,17 @@ export function PlaygroundPage() {
               source="Step 2"
               description="Included in ID token to prevent replay"
             />
-            <ParamRow
-              label="code_challenge"
-              value={state.codeChallenge}
-              source="Step 2"
-              description="SHA-256 hash of code_verifier"
-            />
-            <ParamRow label="code_challenge_method" value="S256" />
+            {isPkce && (
+              <>
+                <ParamRow
+                  label="code_challenge"
+                  value={state.codeChallenge}
+                  source="Step 2"
+                  description="SHA-256 hash of code_verifier"
+                />
+                <ParamRow label="code_challenge_method" value="S256" />
+              </>
+            )}
             {provider.extraAuthParams &&
               Object.entries(provider.extraAuthParams).map(([key, val]) => (
                 <ParamRow key={key} label={key} value={val} source="Provider config" />
@@ -885,7 +1140,7 @@ export function PlaygroundPage() {
           </div>
         </div>
 
-        {state.currentStep === 2 && (
+        {isActive && (
           <button
             onClick={handleRedirect}
             className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2"
@@ -898,28 +1153,58 @@ export function PlaygroundPage() {
     )
   }
 
-  const renderStep3 = () => {
+  const renderCallback = () => {
     const stateMatches = state.callbackState === state.stateParam
+    const isActive =
+      steps.findIndex((s) => s.render === 'callback') === state.currentStep
 
     return (
       <div className="space-y-4 pt-4">
         <p className="text-sm text-neutral-400">
-          The provider redirected back with an authorization code. Let's verify the state parameter
-          and extract the code.
+          {isImplicit
+            ? 'The provider redirected back with tokens in the URL fragment. Let\u2019s verify the state parameter and examine the tokens.'
+            : 'The provider redirected back with an authorization code. Let\u2019s verify the state parameter and extract the code.'}
         </p>
 
         <div className="bg-neutral-800/50 rounded-lg p-3 space-y-3">
-          <div>
-            <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1">
-              Authorization Code
+          {isImplicit ? (
+            <div className="space-y-2">
+              {state.tokens.access_token && (
+                <div>
+                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1">
+                    Access Token (from fragment)
+                  </div>
+                  <code className="text-xs font-mono text-emerald-400 break-all block">
+                    {state.tokens.access_token.length > 80
+                      ? `${state.tokens.access_token.substring(0, 80)}...`
+                      : state.tokens.access_token}
+                  </code>
+                </div>
+              )}
+              {state.tokens.id_token && (
+                <div>
+                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1">
+                    ID Token (from fragment)
+                  </div>
+                  <code className="text-xs font-mono text-emerald-400 break-all block">
+                    {state.tokens.id_token.substring(0, 80)}...
+                  </code>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <code className="text-xs font-mono text-emerald-400 break-all flex-1">
-                {state.callbackCode}
-              </code>
-              <CopyButton text={state.callbackCode} />
+          ) : (
+            <div>
+              <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1">
+                Authorization Code
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="text-xs font-mono text-emerald-400 break-all flex-1">
+                  {state.callbackCode}
+                </code>
+                <CopyButton text={state.callbackCode} />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="border-t border-neutral-700/50 pt-3">
             <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-2">
@@ -962,98 +1247,175 @@ export function PlaygroundPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => dispatch({ type: 'ADVANCE_STEP' })}
-          disabled={!stateMatches}
-          className={cn(
-            'w-full py-2.5 rounded-lg font-medium text-sm transition-colors',
-            stateMatches
-              ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-              : 'bg-neutral-800 text-neutral-500 cursor-not-allowed',
-          )}
-        >
-          Continue
-        </button>
+        {isImplicit && (
+          <WarningBanner variant="red">
+            These tokens were transmitted in the URL fragment — visible in your browser history and
+            to any JavaScript running on this page. This is why the implicit flow is deprecated.
+          </WarningBanner>
+        )}
+
+        {isActive && (
+          <button
+            onClick={() => dispatch({ type: 'ADVANCE_STEP' })}
+            disabled={!stateMatches}
+            className={cn(
+              'w-full py-2.5 rounded-lg font-medium text-sm transition-colors',
+              stateMatches
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                : 'bg-neutral-800 text-neutral-500 cursor-not-allowed',
+            )}
+          >
+            Continue
+          </button>
+        )}
       </div>
     )
   }
 
-  const renderStep4 = () => (
-    <div className="space-y-4 pt-4">
-      <div className="bg-neutral-800/50 rounded-lg p-3">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-400">
-            POST
-          </span>
-          <code className="text-xs font-mono text-neutral-200 break-all">{state.tokenUrl}</code>
-        </div>
+  const renderExchange = () => {
+    const exchangeStepIndex = steps.findIndex((s) => s.render === 'exchange')
+    const callbackStepNum = steps.findIndex((s) => s.render === 'callback') + 1
+    const isActive = exchangeStepIndex === state.currentStep
+    const corsBlocked = !provider.tokenEndpointCors
 
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">Headers</div>
-        <div className="bg-neutral-900/50 rounded p-2 mb-3">
-          <code className="text-[10px] font-mono">
-            <span className="text-cyan-400">Content-Type</span>
-            <span className="text-neutral-600">: </span>
-            <span className="text-neutral-300">application/x-www-form-urlencoded</span>
-          </code>
-        </div>
+    // Build body params display
+    const bodyParams: { label: string; value: string; source?: string; description?: string }[] =
+      []
 
-        <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">
-          Body Parameters
-        </div>
-        <div className="divide-y divide-neutral-800/50">
-          <ParamRow label="grant_type" value="authorization_code" />
-          <ParamRow label="code" value={state.callbackCode} source="Step 4" />
-          <ParamRow label="client_id" value={state.clientId} source="Step 1" />
-          <ParamRow label="redirect_uri" value={state.redirectUri} source="Step 1" />
-          <ParamRow
-            label="code_verifier"
-            value={state.codeVerifier}
-            source="Step 2"
-            description="The provider will SHA-256 hash this and compare to the code_challenge from step 3"
-          />
-        </div>
-      </div>
+    if (isClientCreds) {
+      bodyParams.push(
+        { label: 'grant_type', value: 'client_credentials' },
+        { label: 'client_id', value: state.clientId, source: 'Step 1' },
+        {
+          label: 'client_secret',
+          value: state.clientSecret ? '\u2022'.repeat(12) : '',
+          source: 'Step 1',
+        },
+        { label: 'scope', value: state.scopes, source: 'Step 1' },
+      )
+    } else {
+      bodyParams.push(
+        { label: 'grant_type', value: 'authorization_code' },
+        {
+          label: 'code',
+          value: state.callbackCode,
+          source: `Step ${callbackStepNum}`,
+        },
+        { label: 'client_id', value: state.clientId, source: 'Step 1' },
+        { label: 'redirect_uri', value: state.redirectUri, source: 'Step 1' },
+      )
+      if (isPkce) {
+        bodyParams.push({
+          label: 'code_verifier',
+          value: state.codeVerifier,
+          source: 'Step 2',
+          description:
+            'The provider will SHA-256 hash this and compare to the code_challenge from the authorization request',
+        })
+      } else {
+        bodyParams.push({
+          label: 'client_secret',
+          value: state.clientSecret ? '\u2022'.repeat(12) : '',
+          source: 'Step 1',
+          description: 'Proves the client is the legitimate owner of the client_id',
+        })
+      }
+    }
 
-      {state.tokenResponse && (
+    return (
+      <div className="space-y-4 pt-4">
+        {corsBlocked && (
+          <WarningBanner>
+            This provider's token endpoint blocks CORS requests from browsers. The exchange will
+            likely fail with a network error. In production, this request happens server-side.
+          </WarningBanner>
+        )}
+
         <div className="bg-neutral-800/50 rounded-lg p-3">
-          <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-2">
-            Response
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono bg-emerald-500/20 text-emerald-400">
+              POST
+            </span>
+            <code className="text-xs font-mono text-neutral-200 break-all">
+              {state.tokenUrl}
+            </code>
           </div>
-          <SyntaxHighlight code={toJsonString(state.tokenResponse)} />
+
+          <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">
+            Headers
+          </div>
+          <div className="bg-neutral-900/50 rounded p-2 mb-3 space-y-1">
+            <code className="text-[10px] font-mono block">
+              <span className="text-cyan-400">Content-Type</span>
+              <span className="text-neutral-600">: </span>
+              <span className="text-neutral-300">application/x-www-form-urlencoded</span>
+            </code>
+            {(isAuthCode || isClientCreds) && (
+              <code className="text-[10px] font-mono block">
+                <span className="text-cyan-400">Accept</span>
+                <span className="text-neutral-600">: </span>
+                <span className="text-neutral-300">application/json</span>
+              </code>
+            )}
+          </div>
+
+          <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">
+            Body Parameters
+          </div>
+          <div className="divide-y divide-neutral-800/50">
+            {bodyParams.map((p) => (
+              <ParamRow key={p.label} {...p} />
+            ))}
+          </div>
         </div>
-      )}
 
-      {state.error && state.currentStep === 4 && (
-        <div className="p-3 rounded-lg bg-red-900/20 border border-red-800/40">
-          <p className="text-sm text-red-400">{state.error}</p>
-        </div>
-      )}
+        {state.tokenResponse && (
+          <div className="bg-neutral-800/50 rounded-lg p-3">
+            <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-2">
+              Response
+            </div>
+            <SyntaxHighlight code={toJsonString(state.tokenResponse)} />
+          </div>
+        )}
 
-      {!state.tokenResponse && (
-        <button
-          onClick={handleExchangeTokens}
-          disabled={state.exchangeLoading}
-          className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {state.exchangeLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Exchanging...
-            </>
-          ) : state.error ? (
-            <>
-              <RefreshCw className="h-4 w-4" /> Retry Exchange
-            </>
-          ) : (
-            <>
-              <Key className="h-4 w-4" /> Exchange Code for Tokens
-            </>
-          )}
-        </button>
-      )}
-    </div>
-  )
+        {state.error && isActive && (
+          <div className="p-3 rounded-lg bg-red-900/20 border border-red-800/40">
+            <p className="text-sm text-red-400">{state.error}</p>
+          </div>
+        )}
 
-  const renderStep5 = () => (
+        {!state.tokenResponse && isActive && (
+          <button
+            onClick={handleExchangeTokens}
+            disabled={state.exchangeLoading}
+            className={cn(
+              'w-full py-2.5 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed',
+              corsBlocked
+                ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white',
+            )}
+          >
+            {state.exchangeLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Exchanging...
+              </>
+            ) : state.error ? (
+              <>
+                <RefreshCw className="h-4 w-4" /> Retry Exchange
+              </>
+            ) : (
+              <>
+                <Key className="h-4 w-4" />
+                {corsBlocked ? 'Try Exchange (may fail due to CORS)' : 'Exchange'}
+              </>
+            )}
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  const renderDecode = () => (
     <div className="space-y-4 pt-4">
       <p className="text-sm text-emerald-400 font-medium">
         Flow complete! Here are your decoded tokens:
@@ -1071,17 +1433,21 @@ export function PlaygroundPage() {
           <code className="text-xs text-neutral-300 break-all">{state.tokens.refresh_token}</code>
         </div>
       )}
+
+      {Object.keys(state.tokens).length === 0 && (
+        <p className="text-sm text-neutral-500">No tokens received.</p>
+      )}
     </div>
   )
 
-  const stepRenderers = [
-    renderStep0,
-    renderStep1,
-    renderStep2,
-    renderStep3,
-    renderStep4,
-    renderStep5,
-  ]
+  const renderers: Record<StepRenderKey, () => React.ReactNode> = {
+    setup: renderSetup,
+    security: renderSecurity,
+    authUrl: renderAuthUrl,
+    callback: renderCallback,
+    exchange: renderExchange,
+    decode: renderDecode,
+  }
 
   // ─── Render ─────────────────────────────────────────────────
 
@@ -1098,8 +1464,13 @@ export function PlaygroundPage() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <h1 className="text-lg font-semibold">OAuth Playground</h1>
-            <span className="text-xs px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30">
-              Auth Code + PKCE
+            <span
+              className={cn(
+                'text-xs px-2 py-0.5 rounded border',
+                badge.className,
+              )}
+            >
+              {badge.label}
             </span>
           </div>
           {state.currentStep > 0 && (
@@ -1117,7 +1488,7 @@ export function PlaygroundPage() {
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-3">
         {/* Progress bar */}
         <div className="flex items-center gap-1 mb-6">
-          {STEP_TITLES.map((_, i) => (
+          {steps.map((_, i) => (
             <div
               key={i}
               className={cn(
@@ -1132,21 +1503,23 @@ export function PlaygroundPage() {
           ))}
         </div>
 
-        {state.error && (
+        {state.error && steps[state.currentStep]?.render !== 'exchange' && (
           <div className="p-3 rounded-lg bg-red-900/20 border border-red-800/40">
             <p className="text-sm text-red-400">{state.error}</p>
           </div>
         )}
 
-        {STEP_TITLES.map((_, i) => (
+        {steps.map((step, i) => (
           <StepCard
-            key={i}
+            key={`${state.flowType}-${i}`}
             stepIndex={i}
+            title={step.title}
+            icon={step.icon}
             currentStep={state.currentStep}
             isExpanded={state.expandedSteps.includes(i)}
             onToggle={() => dispatch({ type: 'TOGGLE_STEP', step: i })}
           >
-            {stepRenderers[i]()}
+            {renderers[step.render]()}
           </StepCard>
         ))}
 

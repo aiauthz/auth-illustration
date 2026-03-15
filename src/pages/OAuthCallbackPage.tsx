@@ -5,8 +5,7 @@ import { Loader2, AlertCircle } from 'lucide-react'
 
 /**
  * OAuth callback handler.
- * Captures the authorization code and state from the redirect,
- * validates state, stores callback data, and redirects to playground.
+ * Handles both auth code callbacks (query params) and implicit flow (URL fragment).
  */
 export function OAuthCallbackPage() {
   const [searchParams] = useSearchParams()
@@ -15,7 +14,7 @@ export function OAuthCallbackPage() {
 
   useEffect(() => {
     const code = searchParams.get('code')
-    const state = searchParams.get('state')
+    const queryState = searchParams.get('state')
     const errorParam = searchParams.get('error')
     const errorDescription = searchParams.get('error_description')
 
@@ -25,7 +24,65 @@ export function OAuthCallbackPage() {
       return
     }
 
-    if (!code || !state) {
+    const MAX_FLOW_AGE_MS = 15 * 60 * 1000
+
+    // Check for implicit flow tokens or errors in URL fragment
+    const hash = window.location.hash
+    if (hash && hash.length > 1) {
+      const fragmentParams = new URLSearchParams(hash.substring(1))
+
+      // Handle errors returned in the fragment (some providers do this for implicit)
+      const fragmentError = fragmentParams.get('error')
+      if (fragmentError) {
+        const fragmentErrorDesc = fragmentParams.get('error_description')
+        setError(`${fragmentError}: ${fragmentErrorDesc || 'Unknown error from provider'}`)
+        return
+      }
+
+      const accessToken = fragmentParams.get('access_token')
+      const fragmentState = fragmentParams.get('state')
+
+      if (accessToken && fragmentState) {
+        const flowState = restoreFlowState()
+        if (!flowState) {
+          setError('No pending OAuth flow found. The flow may have expired or been cleared.')
+          return
+        }
+        if (flowState.state !== fragmentState) {
+          setError('State parameter mismatch. This may indicate a CSRF attack.')
+          return
+        }
+        if (Date.now() - flowState.startedAt > MAX_FLOW_AGE_MS) {
+          setError('This OAuth flow has expired. Please start a new flow from the playground.')
+          return
+        }
+
+        sessionStorage.setItem(
+          'oauth_playground_callback',
+          JSON.stringify({
+            flowType: 'implicit',
+            access_token: accessToken,
+            token_type: fragmentParams.get('token_type') ?? 'Bearer',
+            id_token: fragmentParams.get('id_token') ?? '',
+            state: fragmentState,
+            receivedAt: Date.now(),
+          }),
+        )
+
+        // Clear tokens from URL fragment for security
+        window.history.replaceState(
+          {},
+          '',
+          window.location.pathname + window.location.search,
+        )
+
+        navigate('/playground?flow=resume', { replace: true })
+        return
+      }
+    }
+
+    // Auth code flow: code in query params
+    if (!code || !queryState) {
       setError('Missing code or state parameter in callback URL')
       return
     }
@@ -37,15 +94,13 @@ export function OAuthCallbackPage() {
       return
     }
 
-    if (flowState.state !== state) {
+    if (flowState.state !== queryState) {
       setError(
         'State parameter mismatch. This may indicate a CSRF attack or the flow was started in a different tab.',
       )
       return
     }
 
-    // Reject stale flows (older than 15 minutes)
-    const MAX_FLOW_AGE_MS = 15 * 60 * 1000
     if (Date.now() - flowState.startedAt > MAX_FLOW_AGE_MS) {
       setError('This OAuth flow has expired. Please start a new flow from the playground.')
       return
@@ -56,7 +111,7 @@ export function OAuthCallbackPage() {
       'oauth_playground_callback',
       JSON.stringify({
         code,
-        state,
+        state: queryState,
         receivedAt: Date.now(),
       }),
     )
