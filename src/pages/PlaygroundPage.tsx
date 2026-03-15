@@ -152,7 +152,7 @@ export function PlaygroundPage() {
     let authorizationUrl = provider.authorizationUrl
     let tokenUrl = provider.tokenUrl
     if (creds.issuerUrl && (!authorizationUrl || !tokenUrl)) {
-      const urls = buildOidcUrls(creds.issuerUrl)
+      const urls = buildOidcUrls(creds.issuerUrl, provider.id)
       authorizationUrl = authorizationUrl || urls.authorizationUrl
       tokenUrl = tokenUrl || urls.tokenUrl
     }
@@ -224,7 +224,7 @@ export function PlaygroundPage() {
             : 'complete',
   }))
 
-  const showIssuerUrl = provider.id === 'okta' || provider.id === 'auth0'
+  const showIssuerUrl = provider.needsIssuerUrl ?? false
   const callbackUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/playground/callback`

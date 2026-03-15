@@ -77,6 +77,7 @@ export async function startAuthCodePkceFlow(config: FlowConfig): Promise<FlowEve
     nonce,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
+    ...(config.provider.extraAuthParams ?? {}),
   })
 
   const authUrl = `${config.authorizationUrl}?${params.toString()}`
