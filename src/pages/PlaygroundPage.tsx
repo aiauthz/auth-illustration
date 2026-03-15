@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import confetti from 'canvas-confetti'
 
+import { Group, Panel, Separator } from 'react-resizable-panels'
 import { ProviderSelector } from '@/components/playground/ProviderSelector'
 import { FlowSelector } from '@/components/playground/FlowSelector'
 import { CredentialForm, type CredentialFormData } from '@/components/playground/CredentialForm'
@@ -114,6 +116,13 @@ export function PlaygroundPage() {
           ...prev,
           { type: 'complete', stepId: 'complete', label: 'Flow complete! Tokens received.' },
         ])
+        // Celebrate
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.7 },
+          colors: ['#10b981', '#22c55e', '#6ee7b7', '#059669'],
+        })
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Token exchange failed'
@@ -261,10 +270,11 @@ export function PlaygroundPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-[320px_1fr] gap-6 min-h-[calc(100vh-120px)]">
+      <div className="h-[calc(100vh-53px)] hidden md:block">
+        <Group orientation="horizontal">
           {/* Left panel: Config */}
-          <div className="space-y-5 overflow-y-auto max-h-[calc(100vh-140px)] pr-2">
+          <Panel defaultSize={25} minSize={18} maxSize={35}>
+            <div className="h-full overflow-y-auto p-4 space-y-5">
             <ProviderSelector selectedId={provider.id} onSelect={handleProviderSelect} />
 
             <FlowSelector
@@ -309,10 +319,14 @@ export function PlaygroundPage() {
             )}
 
             <SecurityWarnings onClearCredentials={handleClearCredentials} />
-          </div>
+            </div>
+          </Panel>
+
+          <Separator className="w-1.5 bg-neutral-800 hover:bg-neutral-600 transition-colors rounded-full mx-1" />
 
           {/* Right panel: Visualization */}
-          <div className="flex flex-col gap-4 min-h-0">
+          <Panel defaultSize={75} minSize={50}>
+            <div className="h-full flex flex-col gap-4 p-4 overflow-y-auto">
             {/* Timeline + Token area */}
             <div className="flex-1 grid grid-cols-[1fr_1fr] gap-4 min-h-0">
               {/* Flow Timeline */}
@@ -410,8 +424,37 @@ export function PlaygroundPage() {
                 )}
               </>
             )}
+            </div>
+          </Panel>
+        </Group>
+      </div>
+
+      {/* Mobile fallback: stacked layout */}
+      <div className="md:hidden p-4 space-y-6 overflow-y-auto">
+        <ProviderSelector selectedId={provider.id} onSelect={handleProviderSelect} />
+        <FlowSelector supportedFlows={provider.supportedFlows} selectedFlow={flowType} onSelect={setFlowType} />
+        {phase === 'setup' && (
+          <CredentialForm
+            flowType={flowType}
+            defaultRedirectUri={callbackUrl}
+            defaultScopes={provider.defaultScopes}
+            onSubmit={handleStartFlow}
+            showIssuerUrl={showIssuerUrl}
+          />
+        )}
+        <SecurityWarnings onClearCredentials={handleClearCredentials} />
+        {timelineSteps.length > 0 && (
+          <div className="bg-neutral-900 rounded-lg border border-neutral-800 p-4">
+            <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">Flow Progress</h3>
+            <FlowTimeline steps={timelineSteps} />
           </div>
-        </div>
+        )}
+        {Object.keys(tokens).length > 0 && (
+          <div className="space-y-4">
+            {tokens.id_token && <JwtDecoder token={tokens.id_token} label="ID Token" />}
+            {tokens.access_token && <JwtDecoder token={tokens.access_token} label="Access Token" />}
+          </div>
+        )}
       </div>
     </div>
   )

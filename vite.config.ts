@@ -26,6 +26,8 @@ export default defineConfig({
             '@radix-ui/react-tabs',
             '@radix-ui/react-label',
           ],
+          prism: ['prism-react-renderer'],
+          panels: ['react-resizable-panels'],
         },
       },
     },

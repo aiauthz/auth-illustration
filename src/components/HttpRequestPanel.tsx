@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { SyntaxHighlight, toJsonString } from '@/components/SyntaxHighlight'
 
 export interface HttpRequestEntry {
   id: string
@@ -24,72 +25,6 @@ interface HttpRequestPanelProps {
   activeStepId: string
 }
 
-function JsonView({ data }: { data: unknown }) {
-  if (data === null || data === undefined) return null
-
-  const renderValue = (value: unknown, indent: number): React.ReactNode => {
-    if (value === undefined) return null
-    if (typeof value === 'string') {
-      const truncated = value.length > 60 ? value.substring(0, 57) + '...' : value
-      return <span className="text-green-400">"{truncated}"</span>
-    }
-    if (typeof value === 'number') {
-      return <span className="text-yellow-400">{value}</span>
-    }
-    if (typeof value === 'boolean') {
-      return <span className="text-yellow-400">{value.toString()}</span>
-    }
-    if (value === null) {
-      return <span className="text-neutral-500">null</span>
-    }
-    if (Array.isArray(value)) {
-      if (value.length === 0) return <span>[]</span>
-      const pad = '  '.repeat(indent)
-      const innerPad = '  '.repeat(indent + 1)
-      return (
-        <span>
-          {'[\n'}
-          {value.map((item, i) => (
-            <span key={i}>
-              {innerPad}
-              {renderValue(item, indent + 1)}
-              {i < value.length - 1 ? ',' : ''}
-              {'\n'}
-            </span>
-          ))}
-          {pad}
-          {']'}
-        </span>
-      )
-    }
-    if (typeof value === 'object') {
-      const entries = Object.entries(value as Record<string, unknown>)
-      if (entries.length === 0) return <span>{'{}'}</span>
-      const pad = '  '.repeat(indent)
-      const innerPad = '  '.repeat(indent + 1)
-      return (
-        <span>
-          {'{\n'}
-          {entries.map(([key, val], i) => (
-            <span key={key}>
-              {innerPad}
-              <span className="text-cyan-400">"{key}"</span>
-              {': '}
-              {renderValue(val, indent + 1)}
-              {i < entries.length - 1 ? ',' : ''}
-              {'\n'}
-            </span>
-          ))}
-          {pad}
-          {'}'}
-        </span>
-      )
-    }
-    return <span>{String(value)}</span>
-  }
-
-  return <pre className="whitespace-pre text-xs leading-relaxed">{renderValue(data, 0)}</pre>
-}
 
 function StatusBadge({ status, statusText }: { status: number; statusText: string }) {
   const color =
@@ -242,7 +177,7 @@ export function HttpRequestPanel({ entries, activeStepId }: HttpRequestPanelProp
                   Body
                 </div>
                 <div className="bg-neutral-900 rounded p-2">
-                  <JsonView data={selectedEntry.body} />
+                  <SyntaxHighlight code={toJsonString(selectedEntry.body)} />
                 </div>
               </div>
             )}
@@ -289,7 +224,7 @@ export function HttpRequestPanel({ entries, activeStepId }: HttpRequestPanelProp
                   Body
                 </div>
                 <div className="bg-neutral-900 rounded p-2">
-                  <JsonView data={selectedEntry.response.body} />
+                  <SyntaxHighlight code={toJsonString(selectedEntry.response.body)} />
                 </div>
               </div>
             )}

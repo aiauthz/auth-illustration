@@ -68,9 +68,12 @@ export function Stage({ nodes, edges, children, className }: StageProps) {
 
   // Calculate scale to fit 16:9 content in full screen
   useEffect(() => {
+    let retryCount = 0
+    const MAX_RETRIES = 10
+
     const updateScale = () => {
       if (!containerRef.current) {
-        setTimeout(updateScale, 100)
+        if (retryCount++ < MAX_RETRIES) setTimeout(updateScale, 100)
         return
       }
 
@@ -79,7 +82,7 @@ export function Stage({ nodes, edges, children, className }: StageProps) {
       const containerHeight = container.clientHeight || container.offsetHeight
 
       if (!containerWidth || !containerHeight) {
-        setTimeout(updateScale, 100)
+        if (retryCount++ < MAX_RETRIES) setTimeout(updateScale, 100)
         return
       }
 

@@ -53,6 +53,16 @@ export function FlowTimeline({ steps, onStepClick, className }: FlowTimelineProp
                 isClickable && 'cursor-pointer',
               )}
               onClick={() => isClickable && toggle(step.id)}
+              onKeyDown={(e) => {
+                if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault()
+                  toggle(step.id)
+                }
+              }}
+              tabIndex={isClickable ? 0 : -1}
+              role={hasDetail ? 'button' : undefined}
+              aria-expanded={hasDetail ? isExpanded : undefined}
+              aria-label={`Step: ${step.label}${hasDetail ? ', click to expand details' : ''}`}
             >
               {/* Timeline line + dot */}
               <div className="flex flex-col items-center flex-shrink-0">

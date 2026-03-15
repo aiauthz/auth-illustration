@@ -44,6 +44,13 @@ export function OAuthCallbackPage() {
       return
     }
 
+    // Reject stale flows (older than 15 minutes)
+    const MAX_FLOW_AGE_MS = 15 * 60 * 1000
+    if (Date.now() - flowState.startedAt > MAX_FLOW_AGE_MS) {
+      setError('This OAuth flow has expired. Please start a new flow from the playground.')
+      return
+    }
+
     // Store callback data and redirect to playground
     sessionStorage.setItem(
       'oauth_playground_callback',
