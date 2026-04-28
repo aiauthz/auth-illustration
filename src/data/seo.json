@@ -1,0 +1,65 @@
+{
+  "site": {
+    "url": "https://oauthflows.com",
+    "name": "oauthflows",
+    "image": "https://oauthflows.com/og-image.png",
+    "twitter": "@oauthflows",
+    "locale": "en_US"
+  },
+  "home": {
+    "title": "OAuth 2.0 & OIDC Flows, Visualized | oauthflows",
+    "description": "Step-by-step visualizations of OAuth 2.0, OpenID Connect, PKCE, Device Code, Client Credentials, and ID-JAG flows. Learn auth by watching it happen.",
+    "path": "/"
+  },
+  "playground": {
+    "title": "OAuth Playground — Live OAuth 2.0 / OIDC Tester",
+    "description": "Plug in your own OAuth client and watch the flow execute live: real HTTP requests, real redirects, decoded JWTs. Free OAuth 2.0 & OIDC playground.",
+    "path": "/playground"
+  },
+  "flows": {
+    "oauth-consent": {
+      "title": "OIDC Login Flow Explained Visually | oauthflows",
+      "description": "See how OpenID Connect authentication works: ID tokens, consent, and SSO walked through step by step with an identity provider."
+    },
+    "pkce": {
+      "title": "PKCE Flow Explained | OAuth 2.0 Auth Code + PKCE",
+      "description": "Visual walkthrough of OAuth 2.0 Authorization Code with PKCE — see how code_verifier and code_challenge stop code interception attacks."
+    },
+    "refresh-token": {
+      "title": "OAuth Refresh Token Flow & Token Rotation Explained",
+      "description": "How OAuth 2.0 refresh tokens silently renew access tokens, and how rotation detects replay attacks before they cause damage."
+    },
+    "client-credentials": {
+      "title": "OAuth Client Credentials (M2M) Flow Explained",
+      "description": "Step-by-step OAuth 2.0 Client Credentials grant for machine-to-machine auth — for microservices, cron jobs, and CI/CD pipelines."
+    },
+    "app-to-app": {
+      "title": "OAuth App-to-App Delegation: Multi-Party Flow",
+      "description": "How does Calendar talk to Zoom without sharing your password? Walk through multi-party OAuth 2.0 delegation with a visual step-by-step flow."
+    },
+    "device-code": {
+      "title": "OAuth Device Code Flow Explained Visually",
+      "description": "How smart TVs and CLI tools use the OAuth 2.0 Device Authorization Grant to log in without a keyboard. Step-by-step polling and user-code visualization."
+    },
+    "implicit-flow": {
+      "title": "OAuth Implicit Flow (Deprecated) Explained",
+      "description": "The legacy OAuth 2.0 Implicit grant dropped tokens into the URL fragment. See exactly why OAuth 2.1 deprecated it and what attacks it enabled."
+    },
+    "ropc": {
+      "title": "OAuth Password Grant (ROPC) — Why It’s Deprecated",
+      "description": "The Resource Owner Password Credentials grant hands the user’s real password to the app, defeating OAuth’s entire purpose. See why ROPC is deprecated."
+    },
+    "delegated-api-key": {
+      "title": "API Key Delegation to AI Agents — The Problem",
+      "description": "What happens when a user hands their API key to an AI agent? Visualize the security holes and why delegated keys aren’t safe in production."
+    },
+    "agent-as-oauth-client": {
+      "title": "AI Agent as OAuth Client — Pattern & Tradeoffs",
+      "description": "A smarter alternative to API key sharing: the AI agent registers as its own OAuth 2.0 client. See the upgrade — and the IdP visibility gap that remains."
+    },
+    "cross-app-access": {
+      "title": "Cross-App Access (ID-JAG) Flow Explained",
+      "description": "Walk through the Identity Assertion Authorization Grant — an emerging OAuth pattern giving IdPs full visibility into AI agent access across SaaS apps."
+    }
+  }
+}

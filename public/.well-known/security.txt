@@ -1,0 +1,5 @@
+# If you find a security issue with oauthflows.com, please report it here.
+Contact: mailto:sohail.pathan@okta.com
+Preferred-Languages: en
+Canonical: https://oauthflows.com/.well-known/security.txt
+Expires: 2027-04-28T00:00:00.000Z

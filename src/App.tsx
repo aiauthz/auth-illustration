@@ -7,6 +7,7 @@ import { HomePage } from '@/pages/HomePage'
 const PresentationPage = lazy(() => import('@/pages/PresentationPage').then((m) => ({ default: m.PresentationPage })))
 const PlaygroundPage = lazy(() => import('@/pages/PlaygroundPage').then((m) => ({ default: m.PlaygroundPage })))
 const OAuthCallbackPage = lazy(() => import('@/pages/OAuthCallbackPage').then((m) => ({ default: m.OAuthCallbackPage })))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })))
 
 const Loading = () => (
   <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
@@ -25,6 +26,7 @@ function App() {
           <Route path="/flows/:slug" element={<PresentationPage />} />
           <Route path="/playground" element={<PlaygroundPage />} />
           <Route path="/playground/callback" element={<OAuthCallbackPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     </ErrorBoundary>

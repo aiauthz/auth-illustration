@@ -3,30 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
+
     <!-- Primary Meta Tags -->
-    <title>oauthflows - Interactive Auth Flow Visualization</title>
-    <meta name="title" content="oauthflows - Interactive Auth Flow Visualization" />
-    <meta name="description" content="Explore OAuth 2.0, OpenID Connect, and Identity Assertion Authorization Grant (ID-JAG) flows through interactive step-by-step visualizations. Learn how AI agents authenticate securely with IdP visibility." />
-    <meta name="keywords" content="OAuth, OIDC, OpenID Connect, OAuth 2.0, Authentication, Authorization, ID-JAG, Identity Assertion, AI Agent Authentication, Okta, SSO, Access Token, ID Token, Security" />
+    <title>OAuth 2.0 &amp; OIDC Flows, Visualized | oauthflows</title>
+    <meta name="title" content="OAuth 2.0 &amp; OIDC Flows, Visualized | oauthflows" />
+    <meta name="description" content="Interactive, step-by-step visualizations of OAuth 2.0, OpenID Connect, PKCE, Device Code, Client Credentials, and Identity Assertion (ID-JAG) flows. Learn modern auth by watching it happen." />
     <meta name="author" content="Sohail Pathan" />
-    
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <link rel="canonical" href="https://oauthflows.com/" />
+
     <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://oauthflows.com/">
-    <meta property="og:title" content="oauthflows - Interactive Auth Flow Visualization">
-    <meta property="og:description" content="Explore OAuth 2.0, OpenID Connect, and Identity Assertion Authorization Grant (ID-JAG) flows through interactive step-by-step visualizations. Learn how AI agents authenticate securely with modern identity protocols.">
-    <meta property="og:image" content="https://oauthflows.com/og-image.png">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="oauthflows" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://oauthflows.com/" />
+    <meta property="og:title" content="OAuth 2.0 &amp; OIDC Flows, Visualized | oauthflows" />
+    <meta property="og:description" content="Interactive, step-by-step visualizations of OAuth 2.0, OpenID Connect, PKCE, Device Code, Client Credentials, and Identity Assertion (ID-JAG) flows. Learn modern auth by watching it happen." />
+    <meta property="og:image" content="https://oauthflows.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="oauthflows — interactive OAuth 2.0 and OIDC flow visualizations" />
 
     <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://oauthflows.com/">
-    <meta property="twitter:title" content="oauthflows - Interactive Auth Flow Visualization">
-    <meta property="twitter:description" content="Explore OAuth 2.0, OpenID Connect, and Identity Assertion Authorization Grant (ID-JAG) flows through interactive step-by-step visualizations. Learn how AI agents authenticate securely with modern identity protocols.">
-    <meta property="twitter:image" content="https://oauthflows.com/og-image.png">
-    
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@oauthflows" />
+    <meta name="twitter:url" content="https://oauthflows.com/" />
+    <meta name="twitter:title" content="OAuth 2.0 &amp; OIDC Flows, Visualized | oauthflows" />
+    <meta name="twitter:description" content="Interactive, step-by-step visualizations of OAuth 2.0, OpenID Connect, PKCE, Device Code, Client Credentials, and Identity Assertion (ID-JAG) flows." />
+    <meta name="twitter:image" content="https://oauthflows.com/og-image.png" />
+
+    <!-- Performance hints for Google Analytics -->
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin />
+
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-QKR4Z9046H"></script>
     <script>
@@ -36,17 +45,44 @@
 
       gtag('config', 'G-QKR4Z9046H');
     </script>
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/auth-icon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    
+
     <!-- Theme Color -->
     <meta name="theme-color" content="#171717" />
+
+    <!-- Sitewide JSON-LD -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "oauthflows",
+        "url": "https://oauthflows.com",
+        "description": "Interactive, step-by-step visualizations of OAuth 2.0, OpenID Connect, PKCE, Device Code, Client Credentials, and Identity Assertion (ID-JAG) flows."
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="max-width:640px;margin:64px auto;padding:24px;font-family:system-ui,sans-serif;color:#e5e5e5;background:#171717;border:1px solid #262626;border-radius:8px;">
+        <h1 style="color:#10b981;margin:0 0 12px;">oauthflows — OAuth 2.0 &amp; OIDC Flows, Visualized</h1>
+        <p>oauthflows is an interactive learning tool covering OAuth 2.0, OpenID Connect, PKCE, the Device Authorization Grant, Client Credentials, Refresh Tokens, and the Identity Assertion Authorization Grant (ID-JAG) for AI agents.</p>
+        <p>This site requires JavaScript to render the interactive flow diagrams. Please enable JavaScript and reload the page.</p>
+        <ul>
+          <li><a style="color:#10b981" href="/flows/pkce">Authorization Code + PKCE</a></li>
+          <li><a style="color:#10b981" href="/flows/oauth-consent">OIDC Authentication</a></li>
+          <li><a style="color:#10b981" href="/flows/device-code">Device Authorization Grant</a></li>
+          <li><a style="color:#10b981" href="/flows/client-credentials">Client Credentials (M2M)</a></li>
+          <li><a style="color:#10b981" href="/flows/refresh-token">Refresh Token Flow</a></li>
+          <li><a style="color:#10b981" href="/flows/cross-app-access">Cross-App Access (ID-JAG)</a></li>
+          <li><a style="color:#10b981" href="/playground">OAuth Playground</a></li>
+        </ul>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

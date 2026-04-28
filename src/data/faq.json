@@ -1,0 +1,34 @@
+[
+  {
+    "q": "What is the difference between OAuth 2.0 and OpenID Connect (OIDC)?",
+    "a": "OAuth 2.0 answers, \"What is this app allowed to access?\" OpenID Connect answers, \"Who is the user?\" OIDC sits on top of OAuth and adds identity primitives like the ID token. If you are connecting to an API, OAuth may be enough. If you are signing a user into your app, you almost certainly want OIDC."
+  },
+  {
+    "q": "Which OAuth 2.0 flow should I use for a single-page or mobile app?",
+    "a": "Use Authorization Code with PKCE. That is the current best practice for browser apps and mobile apps. PKCE closes the classic code interception gap by proving the app that started the login is the same one redeeming the code. If someone suggests the Implicit flow for a new app, they are giving you outdated advice."
+  },
+  {
+    "q": "Why is the OAuth 2.0 Implicit grant deprecated?",
+    "a": "Because it solved a browser limitation from another era and left us with worse security properties. The access token came back through the front channel, usually in the URL, which made leakage and misuse much harder to control. Once modern browsers and PKCE made Authorization Code practical for public clients, there was no good reason to keep using Implicit."
+  },
+  {
+    "q": "Why shouldn’t I use the OAuth Password Grant (ROPC)?",
+    "a": "ROPC asks users to hand their password directly to your app, which is exactly the behavior modern identity systems try to eliminate. It breaks the IdP's ability to apply MFA, phishing resistance, step-up auth, and other policy controls at the login screen. In practice, it turns your app into a fake login box with too much responsibility and too little security. Avoid it."
+  },
+  {
+    "q": "What is the OAuth Device Code flow used for?",
+    "a": "Device Code is for devices that cannot do a normal browser-based redirect flow well: TVs, CLI tools, kiosks, printers, consoles, and similar constrained clients. The device shows a code, the user completes sign-in on another device, and the original device polls until approval is done. It is a great fit when typing a password locally would be awkward or unsafe."
+  },
+  {
+    "q": "When should I use OAuth Client Credentials?",
+    "a": "Use Client Credentials when one system is calling another system and there is no user in the picture. Good examples are backend jobs, service daemons, internal APIs, and CI/CD automation. Do not use it to represent a user action. If a real person kicked something off and you care who that person was, you need a user-bound grant instead."
+  },
+  {
+    "q": "What is the Identity Assertion Authorization Grant (ID-JAG)?",
+    "a": "ID-JAG is an emerging pattern for cross-application authorization where one app presents a signed identity assertion and another app relies on the identity provider to validate what should happen next. The big idea is that cross-app calls become explicit, policy-aware, and short-lived instead of being powered by broad shared secrets. That makes it especially interesting for agentic and SaaS-to-SaaS scenarios."
+  },
+  {
+    "q": "How should AI agents authenticate to SaaS APIs?",
+    "a": "Treat the agent like software that needs scoped, revocable access, not like a vault for permanent API keys. The baseline answer is OAuth with clear client registration, user consent, and short-lived tokens. For more advanced cross-app agent workflows, patterns like ID-JAG are promising because they let the identity layer stay in the middle of each delegated action instead of trusting the agent with broad standing access."
+  }
+]

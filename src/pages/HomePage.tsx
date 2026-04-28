@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -9,24 +9,58 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card'
+import { Seo } from '@/components/Seo'
 import { SLIDES } from '@/lib/slides'
+import { HOME_SEO, SITE_NAME, SITE_URL, canonicalUrl } from '@/lib/seo'
 import homepageData from '@/data/homepage.json'
+import faqData from '@/data/faq.json'
+
+const HOME_JSON_LD = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: SITE_NAME,
+    url: SITE_URL,
+    description: HOME_SEO.description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'OAuth 2.0 and OIDC flow visualizations',
+    itemListElement: SLIDES.filter((s) => s.ready).map((slide, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: canonicalUrl(`/flows/${slide.slug}`),
+      name: slide.title,
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqData.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a },
+    })),
+  },
+]
 
 export function HomePage() {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-16">
+    <main className="mx-auto max-w-6xl px-6 py-16">
+      <Seo {...HOME_SEO} jsonLd={HOME_JSON_LD} />
       {/* Hero */}
       <section className="mb-20 text-center">
         <h1 className="text-4xl font-bold tracking-tight text-emerald-500 sm:text-5xl">
-          {homepageData.hero.title}
+          OAuth 2.0 &amp; OIDC Flows, Visualized
         </h1>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-neutral-400">
           {homepageData.hero.subtitle}
         </p>
-        <Link to={`/flows/${(SLIDES.find((s) => s.component) ?? SLIDES[0]).slug}`} className="mt-8 inline-block">
+        <Link to={`/flows/${(SLIDES.find((s) => s.ready) ?? SLIDES[0]).slug}`} className="mt-8 inline-block">
           <Button size="lg" className="gap-2">
             {homepageData.hero.cta}
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Button>
         </Link>
       </section>
@@ -57,7 +91,7 @@ export function HomePage() {
                   {homepageData.playground.description}
                 </p>
               </div>
-              <ArrowRight className="h-6 w-6 text-emerald-500 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="h-6 w-6 text-emerald-500 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
             </div>
           </div>
         </Link>
@@ -77,7 +111,7 @@ export function HomePage() {
             </h2>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {categorySlides.map((slide) => {
-                const isReady = !!slide.component
+                const isReady = slide.ready
                 const globalIndex = SLIDES.indexOf(slide)
 
                 const card = (
@@ -122,6 +156,38 @@ export function HomePage() {
           </section>
         )
       })}
-    </div>
+
+      {/* FAQ */}
+      <section className="mt-16 mb-12 text-left">
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-500">
+            Frequently Asked Questions
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm text-neutral-400">
+            Short answers to common OAuth 2.0, OIDC, and authentication flow questions.
+          </p>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60">
+          <dl className="divide-y divide-neutral-800">
+            {faqData.map((item) => (
+              <div key={item.q}>
+                <details className="group px-6 py-1 sm:px-8">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-base font-semibold text-neutral-100 marker:content-none">
+                    <span>{item.q}</span>
+                    <ChevronDown
+                      className="h-5 w-5 shrink-0 text-neutral-500 transition-transform duration-200 group-open:rotate-180 group-open:text-emerald-400"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <dd className="max-w-4xl pb-5 pr-8 text-sm leading-7 text-neutral-400">
+                    {item.a}
+                  </dd>
+                </details>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+    </main>
   )
 }

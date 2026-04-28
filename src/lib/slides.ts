@@ -1,39 +1,36 @@
-import { Slide1_OAuthConsent } from '@/slides/Slide1_OAuthConsent'
-import { Slide0_PKCE } from '@/slides/Slide0_PKCE'
-import { Slide7_RefreshToken } from '@/slides/Slide7_RefreshToken'
-import { Slide6_ClientCredentials } from '@/slides/Slide6_ClientCredentials'
-import { Slide2_AppToApp } from '@/slides/Slide2_AppToApp'
-import { Slide8_DeviceCode } from '@/slides/Slide8_DeviceCode'
-import { Slide9_ImplicitFlow } from '@/slides/Slide9_ImplicitFlow'
-import { Slide10_ROPC } from '@/slides/Slide10_ROPC'
-import { Slide3_DelegatedApiKey } from '@/slides/Slide3_DelegatedApiKey'
-import { Slide4_AgentAsOAuthClient } from '@/slides/Slide4_AgentAsOAuthClient'
-import { Slide5_CrossAppAccess } from '@/slides/Slide5_CrossAppAccess'
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import slidesData from '@/data/slides.json'
 
 export interface SlideMetadata {
-  component?: React.ComponentType
   slug: string
   title: string
   description: string
   category?: string
+  /** True when a real visualization component exists for this slide. */
+  ready: boolean
+  /** Lazy-loaded slide component. Only present when ready=true. */
+  component?: LazyExoticComponent<ComponentType>
 }
 
-const componentMap: Record<string, React.ComponentType> = {
-  'oauth-consent': Slide1_OAuthConsent,
-  'pkce': Slide0_PKCE,
-  'refresh-token': Slide7_RefreshToken,
-  'client-credentials': Slide6_ClientCredentials,
-  'app-to-app': Slide2_AppToApp,
-  'device-code': Slide8_DeviceCode,
-  'implicit-flow': Slide9_ImplicitFlow,
-  'ropc': Slide10_ROPC,
-  'delegated-api-key': Slide3_DelegatedApiKey,
-  'agent-as-oauth-client': Slide4_AgentAsOAuthClient,
-  'cross-app-access': Slide5_CrossAppAccess,
+const componentLoaders: Record<string, () => Promise<{ default: ComponentType }>> = {
+  'oauth-consent': () => import('@/slides/Slide1_OAuthConsent').then((m) => ({ default: m.Slide1_OAuthConsent })),
+  'pkce': () => import('@/slides/Slide0_PKCE').then((m) => ({ default: m.Slide0_PKCE })),
+  'refresh-token': () => import('@/slides/Slide7_RefreshToken').then((m) => ({ default: m.Slide7_RefreshToken })),
+  'client-credentials': () => import('@/slides/Slide6_ClientCredentials').then((m) => ({ default: m.Slide6_ClientCredentials })),
+  'app-to-app': () => import('@/slides/Slide2_AppToApp').then((m) => ({ default: m.Slide2_AppToApp })),
+  'device-code': () => import('@/slides/Slide8_DeviceCode').then((m) => ({ default: m.Slide8_DeviceCode })),
+  'implicit-flow': () => import('@/slides/Slide9_ImplicitFlow').then((m) => ({ default: m.Slide9_ImplicitFlow })),
+  'ropc': () => import('@/slides/Slide10_ROPC').then((m) => ({ default: m.Slide10_ROPC })),
+  'delegated-api-key': () => import('@/slides/Slide3_DelegatedApiKey').then((m) => ({ default: m.Slide3_DelegatedApiKey })),
+  'agent-as-oauth-client': () => import('@/slides/Slide4_AgentAsOAuthClient').then((m) => ({ default: m.Slide4_AgentAsOAuthClient })),
+  'cross-app-access': () => import('@/slides/Slide5_CrossAppAccess').then((m) => ({ default: m.Slide5_CrossAppAccess })),
 }
 
-export const SLIDES: SlideMetadata[] = slidesData.map((slide) => ({
-  ...slide,
-  component: componentMap[slide.slug],
-}))
+export const SLIDES: SlideMetadata[] = slidesData.map((slide) => {
+  const loader = componentLoaders[slide.slug]
+  return {
+    ...slide,
+    ready: !!loader,
+    component: loader ? lazy(loader) : undefined,
+  }
+})

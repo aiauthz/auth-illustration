@@ -19,6 +19,9 @@ import {
 } from 'lucide-react'
 import confetti from 'canvas-confetti'
 
+import { Seo } from '@/components/Seo'
+import { PLAYGROUND_SEO, SITE_NAME, SITE_URL, canonicalUrl } from '@/lib/seo'
+import { analytics } from '@/lib/analytics'
 import { ProviderSelector } from '@/components/playground/ProviderSelector'
 import { FlowSelector } from '@/components/playground/FlowSelector'
 import { JwtDecoder } from '@/components/playground/JwtDecoder'
@@ -493,8 +496,9 @@ export function PlaygroundPage() {
         origin: { y: 0.7 },
         colors: ['#10b981', '#22c55e', '#6ee7b7', '#059669'],
       })
+      analytics.playgroundFlowComplete(state.flowType)
     }
-  }, [state.currentStep, state.tokens, steps.length])
+  }, [state.currentStep, state.tokens, steps.length, state.flowType])
 
   // Resume flow after redirect
   const resumeFlow = useCallback(() => {
@@ -1451,17 +1455,31 @@ export function PlaygroundPage() {
 
   // ─── Render ─────────────────────────────────────────────────
 
+  const playgroundJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'OAuth Playground',
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'Web',
+    url: canonicalUrl(PLAYGROUND_SEO.path),
+    description: PLAYGROUND_SEO.description,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: SITE_URL },
+  }
+
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
+    <main className="min-h-screen bg-neutral-950 text-neutral-100">
+      <Seo {...PLAYGROUND_SEO} jsonLd={playgroundJsonLd} />
       {/* Header */}
       <div className="border-b border-neutral-800 bg-neutral-900/80 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               to="/"
+              aria-label="Back to home"
               className="text-neutral-500 hover:text-neutral-300 transition-colors"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             </Link>
             <h1 className="text-lg font-semibold">OAuth Playground</h1>
             <span
@@ -1527,6 +1545,6 @@ export function PlaygroundPage() {
           <SecurityWarnings onClearCredentials={handleReset} />
         </div>
       </div>
-    </div>
+    </main>
   )
 }

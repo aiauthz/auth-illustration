@@ -1,0 +1,191 @@
+{
+  "oauth-consent": {
+    "h1": "OIDC Login Flow Explained Visually",
+    "intro": "OpenID Connect (OIDC) is the identity layer built on top of OAuth 2.0. Where OAuth 2.0 is about authorization (what an app can do), OIDC adds authentication (who the user is) by returning a signed ID token alongside the access token. This walkthrough shows the OIDC Authorization Code flow — the canonical way a web app logs a user in via an identity provider.",
+    "whenToUse": "Use OIDC whenever you need to authenticate a user — that is, log them in. If your app shows a 'Sign in with Google' button, you're using OIDC. If it just calls Google APIs on the user's behalf without needing to know who they are, plain OAuth 2.0 is enough.",
+    "steps": [
+      { "name": "User clicks Sign In", "text": "The relying party (your app) redirects the browser to the identity provider's /authorize endpoint with response_type=code, scope=openid, a client_id, redirect_uri, state, and nonce." },
+      { "name": "User authenticates at the IdP", "text": "The identity provider authenticates the user (password, MFA, passkey) and shows a consent screen describing the requested scopes." },
+      { "name": "IdP redirects back with a code", "text": "On approval, the IdP redirects to the app's redirect_uri with an authorization code and the original state value." },
+      { "name": "App exchanges code for tokens", "text": "The app's backend POSTs to the /token endpoint with the code, client credentials, and redirect_uri, and receives an ID token, access token, and (optionally) a refresh token." },
+      { "name": "App validates ID token", "text": "Your app verifies the ID token's signature, issuer, audience, expiry, and nonce. The token's sub claim is the stable user identifier." }
+    ],
+    "gotchas": [
+      "Always include and verify the nonce — it binds the ID token to this specific login attempt and stops token replay.",
+      "Validate the ID token signature using the IdP's published JWKS, not the access token. Access tokens are opaque to your app.",
+      "The state parameter must be unguessable and bound to the user's session. It's your CSRF defense for the redirect."
+    ],
+    "related": ["pkce", "refresh-token", "implicit-flow"]
+  },
+  "pkce": {
+    "h1": "PKCE Flow Explained: OAuth 2.0 Authorization Code + PKCE",
+    "intro": "Proof Key for Code Exchange (PKCE, RFC 7636) is the OAuth 2.0 extension that makes the Authorization Code flow safe for public clients — single-page apps, mobile apps, and CLIs that can't keep a client secret. PKCE binds the authorization code to a one-time secret only the legitimate client knows, so an attacker who intercepts the code can't redeem it.",
+    "whenToUse": "Use Authorization Code + PKCE for every public client. As of OAuth 2.1, PKCE is also recommended for confidential clients — there's no longer a reason to skip it. SPAs, mobile apps, desktop apps, and CLIs should always use this flow.",
+    "steps": [
+      { "name": "Generate code_verifier and code_challenge", "text": "The client generates a cryptographically random 43–128 character code_verifier, then derives code_challenge = BASE64URL(SHA256(code_verifier))." },
+      { "name": "Send user to /authorize with code_challenge", "text": "Build the authorization URL with response_type=code, client_id, redirect_uri, scope, state, code_challenge, and code_challenge_method=S256." },
+      { "name": "User authenticates and approves", "text": "The IdP authenticates the user and redirects back to the app's redirect_uri with an authorization code and the original state." },
+      { "name": "Exchange code with code_verifier", "text": "POST to /token with grant_type=authorization_code, the code, redirect_uri, client_id, and the original code_verifier. The IdP recomputes the challenge and rejects the request if they don't match." },
+      { "name": "Receive and use tokens", "text": "The IdP returns access_token, optionally id_token (if openid scope) and refresh_token. The intercepted code is now useless without the verifier." }
+    ],
+    "gotchas": [
+      "Use code_challenge_method=S256 only. The plain method exists for legacy clients but offers no protection against an attacker who intercepts the URL.",
+      "Generate a fresh verifier per authorization request. Reusing one verifier across multiple flows defeats the binding.",
+      "Browser SPAs must store the verifier somewhere it survives the redirect — sessionStorage works, localStorage is risky if your app has any XSS surface."
+    ],
+    "related": ["oauth-consent", "refresh-token", "implicit-flow"]
+  },
+  "refresh-token": {
+    "h1": "OAuth Refresh Token Flow & Token Rotation",
+    "intro": "Access tokens expire — usually in 15 minutes to an hour. The refresh token grant lets your app get a new access token silently, without sending the user back through the login flow. Refresh tokens are long-lived and powerful, which is exactly why modern OAuth servers rotate and revoke them aggressively.",
+    "whenToUse": "Use refresh tokens whenever you need a session that outlives a single access-token lifetime — most user-facing apps. Skip refresh tokens for purely machine-to-machine calls (use Client Credentials and re-fetch tokens on demand) and for short interactive sessions where re-authentication is acceptable.",
+    "steps": [
+      { "name": "Initial flow returns a refresh token", "text": "After Authorization Code (with offline_access or equivalent scope), the /token response includes refresh_token alongside access_token." },
+      { "name": "Access token expires", "text": "Your app detects expiry — either by the exp claim, by a 401 from the resource server, or proactively at expires_in seconds." },
+      { "name": "Exchange refresh token for new tokens", "text": "POST to /token with grant_type=refresh_token, refresh_token, and client credentials. The IdP returns a fresh access_token (and optionally a new refresh_token if rotation is on)." },
+      { "name": "Detect replay via rotation", "text": "If the IdP rotates refresh tokens, every use invalidates the previous one. If an attacker uses an old token, the IdP knows it's been replayed and revokes the entire token family." }
+    ],
+    "gotchas": [
+      "Always store refresh tokens server-side or in secure OS keychains. Storing them in localStorage exposes them to any XSS bug — and they don't expire quickly.",
+      "Treat the rotation invariant as load-bearing: if your app uses a refresh token twice (e.g. a race between two tabs), token-family-wide revocation will sign your user out unexpectedly.",
+      "Refresh tokens for public clients should be sender-constrained (DPoP or mTLS). A bare bearer refresh token in a browser is a massive blast radius if leaked."
+    ],
+    "related": ["pkce", "oauth-consent", "client-credentials"]
+  },
+  "client-credentials": {
+    "h1": "OAuth Client Credentials Flow (M2M) Explained",
+    "intro": "The Client Credentials grant is OAuth 2.0 without a user. One service authenticates as itself to call another service's API. It's the simplest OAuth flow — there's no browser, no redirect, no consent screen — just a backend POST that exchanges a client ID and secret for an access token.",
+    "whenToUse": "Use Client Credentials for service-to-service calls where there is no end user: cron jobs, background workers, microservice-to-microservice traffic, CI/CD pipelines, and infrastructure automation. Do not use it on behalf of a user — it has no concept of user identity.",
+    "steps": [
+      { "name": "Service authenticates to /token", "text": "Backend service POSTs to the /token endpoint with grant_type=client_credentials and either Basic auth (client_id + client_secret) or a signed client assertion (private_key_jwt)." },
+      { "name": "IdP issues an access token", "text": "If credentials are valid, the IdP returns a short-lived access token scoped to whatever the client is authorized for — often a narrow set of API permissions." },
+      { "name": "Service calls the API", "text": "Include the access token in the Authorization: Bearer header on every API request. The resource server validates the token's signature, scopes, and expiry." }
+    ],
+    "gotchas": [
+      "Never embed client secrets in browser, mobile, or desktop code. Public clients cannot keep secrets — use a backend-for-frontend pattern instead.",
+      "Prefer private_key_jwt or mTLS over plain client_secret. Symmetric secrets leak through logs, environment variables, and source control.",
+      "Scope these tokens narrowly — Client Credentials tokens are not tied to a user, so they can do everything the client is authorized to do. Least privilege matters more here, not less."
+    ],
+    "related": ["refresh-token", "agent-as-oauth-client", "oauth-consent"]
+  },
+  "app-to-app": {
+    "h1": "OAuth App-to-App Delegation: Multi-Party Flow",
+    "intro": "Real-world OAuth often involves more than two parties. When your calendar app needs to create Zoom links, that's a multi-party delegation: the user authorizes Calendar to act on their behalf at Zoom. This walkthrough shows how a third-party SaaS app obtains delegated access to another SaaS app's API on behalf of a user.",
+    "whenToUse": "Use this pattern any time SaaS app A needs to call SaaS app B as a specific user — calendar/video integrations, CRM/email integrations, file sync, anywhere 'connect your account' appears in a settings UI.",
+    "steps": [
+      { "name": "User triggers integration in app A", "text": "User clicks 'Connect Zoom' in Calendar. Calendar redirects the user to Zoom's /authorize endpoint with Calendar's client_id and the scopes it needs." },
+      { "name": "User authenticates at app B", "text": "Zoom authenticates the user (or recognizes an existing session) and shows a consent screen: 'Calendar wants access to: create meetings, read your profile.'" },
+      { "name": "App B redirects back with a code", "text": "On approval, Zoom redirects to Calendar's redirect_uri with an authorization code." },
+      { "name": "App A exchanges code for tokens", "text": "Calendar's backend exchanges the code for a Zoom access token (and refresh token). These tokens are scoped to this user's Zoom account." },
+      { "name": "App A calls app B's API as the user", "text": "Calendar stores the tokens against the user's Calendar account and uses them to create Zoom meetings on the user's behalf." }
+    ],
+    "gotchas": [
+      "Store per-user tokens, not per-tenant. Two users in the same Calendar workspace might be connected to different Zoom accounts.",
+      "Refresh tokens are sticky — when a user disconnects, you must explicitly revoke at the IdP. Just deleting your local copy leaks long-lived access.",
+      "Watch the consent screen carefully: scope creep ('and 12 more') is a major reason users reject app-to-app integrations. Ask for the minimum."
+    ],
+    "related": ["pkce", "refresh-token", "cross-app-access"]
+  },
+  "device-code": {
+    "h1": "OAuth Device Code Flow Explained Visually",
+    "intro": "The Device Authorization Grant (RFC 8628) lets devices with no keyboard or browser still log a user in. Smart TVs, gaming consoles, IoT devices, CLIs — they all show a short user code and ask the user to visit a URL on their phone or laptop to approve. Meanwhile the device polls for the result.",
+    "whenToUse": "Use device code on any device where typing a password and navigating a redirect is impractical: TVs, set-top boxes, headless servers, command-line tools, and embedded devices. Avoid it on devices that already have a usable browser — the redirect flow is more secure and faster.",
+    "steps": [
+      { "name": "Device requests a device code", "text": "The device POSTs to /device_authorization with its client_id and scope, receiving back a device_code, user_code (e.g. 'WDJB-MJHT'), verification_uri, expires_in, and interval." },
+      { "name": "Device shows the user code", "text": "The device displays the verification URI and user code on screen and tells the user where to enter it." },
+      { "name": "User authenticates on a second device", "text": "User opens the verification URI on their phone, signs in, and enters the user code. They see and approve the consent screen." },
+      { "name": "Device polls for tokens", "text": "While the user authenticates, the device polls /token with grant_type=urn:ietf:params:oauth:grant-type:device_code. It receives authorization_pending, slow_down, or finally a real access token." },
+      { "name": "Device receives tokens and proceeds", "text": "Once the user approves, the next poll returns access_token, optionally refresh_token, and the device is logged in." }
+    ],
+    "gotchas": [
+      "Honor the interval and slow_down responses. Polling too aggressively is the most common reason device flow integrations get rate-limited.",
+      "User codes are short and memorable — and that's also what makes them phishable. Display the verification_uri prominently so users don't enter their code on a lookalike site.",
+      "Device codes expire fast (5–15 minutes). If the user takes too long, the device must request a fresh code, not silently retry."
+    ],
+    "related": ["pkce", "client-credentials", "refresh-token"]
+  },
+  "implicit-flow": {
+    "h1": "OAuth Implicit Flow Explained (Deprecated)",
+    "intro": "The Implicit grant was OAuth 2.0's original answer for browser-based apps that couldn't keep a client secret. It returned access tokens directly in the redirect URL fragment — fast, simple, and as we eventually learned, fundamentally unsafe. OAuth 2.1 deprecates it. This walkthrough exists so you can recognize legacy code and understand why it has to go.",
+    "whenToUse": "Don't. Use Authorization Code + PKCE instead. The only legitimate reason to learn the Implicit flow today is to migrate an existing implementation off it — every modern OAuth library and IdP supports the safer alternative.",
+    "steps": [
+      { "name": "App redirects with response_type=token", "text": "The browser SPA redirects to /authorize with response_type=token (or 'id_token token' for OIDC) and the usual client_id, redirect_uri, scope, state, nonce." },
+      { "name": "User authenticates", "text": "The IdP authenticates the user and shows the consent screen." },
+      { "name": "IdP returns tokens in URL fragment", "text": "The IdP redirects to the app's redirect_uri with the access token (and id_token) in the URL fragment, e.g. #access_token=...&id_token=...&state=..." },
+      { "name": "App reads tokens from fragment", "text": "Client-side JavaScript parses location.hash, extracts the tokens, and stores them — typically in memory or sessionStorage." }
+    ],
+    "gotchas": [
+      "Tokens leak via browser history, referer headers, and any extension or script with DOM access. There's no way to fully contain them in fragment.",
+      "There's no refresh token — the spec forbids it for Implicit. So sessions either re-authorize frequently (UX hit) or you abuse silent iframe tricks (broken by browser cookie policy).",
+      "Token-binding to the original client is impossible. An attacker who intercepts the fragment (network, browser bug, malicious iframe) can replay it freely. PKCE solves exactly this and is why Implicit died."
+    ],
+    "related": ["pkce", "oauth-consent", "ropc"]
+  },
+  "ropc": {
+    "h1": "OAuth Password Grant (ROPC) — Why It’s Deprecated",
+    "intro": "The Resource Owner Password Credentials (ROPC) grant lets an app collect the user's username and password directly and exchange them for tokens at the IdP. It exists in OAuth 2.0 only as a migration path for legacy systems. OAuth 2.1 removes it entirely. Understanding why is a useful security lesson.",
+    "whenToUse": "Don't, except as a one-time migration tool when you genuinely cannot use a redirect-based flow — and even then, only if your app and the IdP share the same security domain. New integrations should use Authorization Code + PKCE or Device Code.",
+    "steps": [
+      { "name": "App collects user credentials", "text": "The app shows a username/password form inside its own UI and the user types their IdP password into your app." },
+      { "name": "App exchanges credentials for tokens", "text": "The app POSTs to /token with grant_type=password, username, password, and its client credentials." },
+      { "name": "IdP returns tokens", "text": "If credentials are valid, the IdP returns access_token, optionally refresh_token. There is no consent screen — the user implicitly consents by typing their password into the app." }
+    ],
+    "gotchas": [
+      "The user just typed their IdP password into a third-party app. That trains them to do it again — for any app, including a phishing site that looks like your app.",
+      "There's no way to enforce MFA, step-up auth, account recovery, risk signals, or progressive profiling. All of those live in the IdP's redirect-based flows.",
+      "The app sees the password. Even if you don't store it, your logs, error trackers, memory dumps, and crash reports will at some point. That makes your app a credential repository whether you want to be one or not."
+    ],
+    "related": ["implicit-flow", "pkce", "oauth-consent"]
+  },
+  "delegated-api-key": {
+    "h1": "API Key Delegation to AI Agents — The Security Problem",
+    "intro": "When an AI agent needs to call a SaaS API on a user's behalf, the most straightforward thing the user can do is hand over an API key. It works on day one. It also concentrates more risk in one secret than almost any other auth pattern in production today. This page walks through what actually breaks.",
+    "whenToUse": "Don't, in production. Delegated API keys are a viable prototyping shortcut for internal tools or research, but every property you'd want for an agent — least privilege, revocation, audit, identity attribution — is missing. The 'Agent as OAuth Client' and 'Cross-App Access (ID-JAG)' patterns exist specifically to replace this.",
+    "steps": [
+      { "name": "User generates a long-lived API key", "text": "The user goes to the SaaS app's settings, generates a personal API key with whatever scopes the SaaS exposes — often everything the user can do." },
+      { "name": "User pastes the key into the agent", "text": "The user hands the key to the AI agent (config file, env var, agent UI). The agent now has a bearer credential for the user's account." },
+      { "name": "Agent calls the API as the user", "text": "Every call the agent makes looks identical to a call the user made. The IdP and SaaS audit logs cannot distinguish 'user did X' from 'agent did X on user's behalf'." }
+    ],
+    "gotchas": [
+      "Blast radius equals the user's full permission set. Revoking the key requires the user to log in and rotate it — easily forgotten when an agent is decommissioned.",
+      "No audit trail attributes actions to the agent. Compliance and incident response are blind to which actions came from a human and which from automation.",
+      "No consent surface. The user authorized 'AI agent' the first time; six months later the agent's behavior has drifted and the user has no way to re-evaluate scope."
+    ],
+    "related": ["agent-as-oauth-client", "cross-app-access", "client-credentials"]
+  },
+  "agent-as-oauth-client": {
+    "h1": "AI Agent as OAuth Client — Pattern and Tradeoffs",
+    "intro": "A meaningful improvement over delegated API keys: register the AI agent itself as an OAuth client. The user authorizes the agent's client_id, the agent gets its own tokens scoped to that user, and revocation lives at the IdP rather than in a manually rotated API key. The catch: the IdP still doesn't know what the agent actually does once it has tokens.",
+    "whenToUse": "Use this when you need a real production agent integration but cannot yet adopt Cross-App Access (ID-JAG). It's strictly better than delegated API keys — least privilege scopes, revocation at the IdP, and a real consent screen — but stops short of giving the IdP visibility into individual downstream API calls.",
+    "steps": [
+      { "name": "Agent registers as an OAuth client", "text": "The agent vendor registers a client_id with the IdP, declaring which scopes it can request and which redirect URIs it owns." },
+      { "name": "User authorizes the agent", "text": "The agent runs the standard Authorization Code + PKCE flow. The user sees a consent screen identifying the agent and the requested scopes." },
+      { "name": "Agent receives its own tokens", "text": "The IdP issues access and refresh tokens scoped to (this user, this agent client_id). The user can revoke just these tokens without affecting other apps." },
+      { "name": "Agent calls APIs", "text": "The agent calls SaaS APIs with its tokens. Audit logs at each SaaS attribute the calls to the agent client_id, not to the user's primary session." }
+    ],
+    "gotchas": [
+      "The IdP sees the initial consent and refreshes — but not individual API calls. If an agent decides to read 10,000 emails, the IdP has no signal to step up auth.",
+      "Scopes are coarse — usually 'read mail' or 'write calendar', not 'read email from this sender for the next 5 minutes'. Granular per-call authorization needs ID-JAG.",
+      "Refresh tokens for agents need a clear lifecycle. A long-lived refresh token in an agent backend is a high-value target — sender-constrain it (DPoP/mTLS) and rotate aggressively."
+    ],
+    "related": ["cross-app-access", "delegated-api-key", "pkce"]
+  },
+  "cross-app-access": {
+    "h1": "Cross-App Access (ID-JAG) Flow Explained",
+    "intro": "The Identity Assertion Authorization Grant (ID-JAG) is the emerging OAuth pattern for AI agents that need to call multiple downstream SaaS apps. The IdP becomes the policy decision point for every cross-app call — it sees who the agent is, who the user is, and which SaaS the agent is trying to reach, and issues a short-lived assertion the SaaS can verify.",
+    "whenToUse": "Use ID-JAG when an agent fans out across more than one SaaS, when you need fine-grained per-call policy, and when audit and revocation must live at the identity provider. It's the only pattern in this set that gives IdPs full visibility into AI agent activity across SaaS apps.",
+    "steps": [
+      { "name": "Agent authenticates to the IdP", "text": "The agent obtains a token from its own IdP (typically Authorization Code + PKCE for the user, or Client Credentials for the agent's own identity)." },
+      { "name": "Agent requests an assertion for a downstream SaaS", "text": "Agent calls the IdP's token-exchange endpoint asking for an assertion to call SaaS X on behalf of user Y, with specific scopes for this single task." },
+      { "name": "IdP evaluates policy and issues an assertion", "text": "The IdP applies access policies (user, agent, SaaS, scopes, time, risk signals) and issues a short-lived signed assertion. Every issuance is logged and revocable." },
+      { "name": "Agent presents the assertion to SaaS X", "text": "The SaaS validates the assertion's signature against the IdP's public key, checks the audience and scope, and grants the call. There's no long-lived API key in the agent." },
+      { "name": "Repeat for the next SaaS call", "text": "For each downstream call, the agent goes back to the IdP for a fresh assertion. The IdP sees and authorizes every interaction." }
+    ],
+    "gotchas": [
+      "Assertions must be short-lived (seconds to minutes). The whole point is that the IdP gets to make a fresh authorization decision per call.",
+      "All SaaS apps in the loop must validate IdP-issued assertions. ID-JAG only works once your downstream apps trust the IdP as an issuer — adoption is the gating factor.",
+      "Performance: every cross-app call now involves an IdP round-trip. Cache assertions where the policy allows it, but don't break the per-call decision invariant."
+    ],
+    "related": ["agent-as-oauth-client", "delegated-api-key", "client-credentials"]
+  }
+}
